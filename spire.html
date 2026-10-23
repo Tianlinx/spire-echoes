@@ -1,0 +1,1703 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>尖塔残响 · Spire Echoes</title>
+<style>
+  :root{
+    --bg:#14161f; --panel:#1d2030; --panel2:#262a3d; --line:#33384f;
+    --txt:#e8eaf2; --dim:#9aa0bd; --gold:#e8c468; --hp:#e0566b;
+    --block:#6fb7e0; --energy:#f3c34e; --atk:#e2604f; --skill:#4f8fe2; --power:#e0b04f;
+    --good:#5fcf80; --bad:#e0566b; --poison:#7fcf6a; --vuln:#e08a4f; --weak:#b07fe0;
+    --hunter:#7fcf9a; --warrior:#e0a04f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 50% -10%, #20243a 0%, var(--bg) 60%);
+    color:var(--txt); font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    overflow:hidden; user-select:none;
+  }
+  #app{height:100vh;display:flex;flex-direction:column}
+  #fx{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden}
+  #arrowLayer{position:fixed;inset:0;pointer-events:none;z-index:90;width:100%;height:100%}
+  button{font-family:inherit;cursor:pointer;color:var(--txt)}
+  .btn{
+    background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line);
+    border-radius:10px; padding:10px 18px; font-size:15px; transition:.12s; color:var(--txt);
+  }
+  .btn:hover{border-color:#5a628c;filter:brightness(1.15)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+  .btn.primary{background:linear-gradient(180deg,#3a4a78,#2a2f48);border-color:#4f8fe2}
+  .btn.gold{border-color:var(--gold);color:var(--gold)}
+  .btn.hunter{border-color:var(--hunter);color:var(--hunter)}
+
+  /* ===== Title / class select ===== */
+  .title-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;overflow:auto}
+  .title-wrap h1{font-size:48px;letter-spacing:6px;
+    background:linear-gradient(90deg,#e8c468,#e2604f);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .title-wrap p{color:var(--dim);font-size:15px;letter-spacing:2px}
+  .title-wrap .sub{color:var(--dim);max-width:560px;text-align:center;line-height:1.7;font-size:13px}
+  .class-row{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;margin:6px 0}
+  .class-card{width:240px;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:18px;
+    cursor:pointer;transition:.15s;text-align:center}
+  .class-card:hover{transform:translateY(-6px)}
+  .class-card.warrior:hover{border-color:var(--warrior);box-shadow:0 0 18px rgba(224,160,79,.4)}
+  .class-card.hunter:hover{border-color:var(--hunter);box-shadow:0 0 18px rgba(127,207,154,.4)}
+  .class-card .cbig{font-size:54px}
+  .class-card .cn{font-size:19px;font-weight:700;margin:6px 0}
+  .class-card .cb{color:var(--dim);font-size:12px;line-height:1.6}
+  .class-card .chp{margin-top:8px;font-size:13px;color:var(--hp)}
+  .stats-line{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;font-size:13px;color:var(--dim)}
+  .stats-line b{color:var(--gold)}
+
+  /* ===== Top bar ===== */
+  .topbar{display:flex;align-items:center;gap:14px;padding:10px 18px;background:var(--panel);
+    border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .stat{display:flex;align-items:center;gap:6px;font-size:14px}
+  .stat .ico{font-size:16px}
+  .hpbar{width:140px;height:14px;background:#3a1f27;border-radius:8px;overflow:hidden;position:relative;border:1px solid #5a2f3a}
+  .hpbar>div{height:100%;background:linear-gradient(90deg,#e0566b,#f08a98);transition:width .25s}
+  .hpbar span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:#fff;text-shadow:0 1px 2px #000}
+  .spacer{flex:1}
+
+  /* ===== Map ===== */
+  .map-wrap{flex:1;overflow:auto;padding:30px 24px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:6px;position:relative}
+  .maplines{position:absolute;top:0;left:0;pointer-events:none;z-index:0}
+  .floor{display:flex;flex-direction:column;gap:24px;justify-content:center;align-items:center;margin:0 20px;position:relative;min-width:64px;z-index:1}
+  .flbl{font-size:11px;color:var(--dim);margin-bottom:4px;letter-spacing:1px}
+  .node{
+    width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:26px;background:var(--panel2);border:2px solid var(--line);position:relative;transition:.15s;z-index:1;
+  }
+  .node .lbl{position:absolute;bottom:-17px;font-size:10px;color:var(--dim);white-space:nowrap}
+  .node.reachable{cursor:pointer;border-color:var(--gold);box-shadow:0 0 14px rgba(232,196,104,.45);animation:pulse 1.4s infinite}
+  .node.reachable:hover{transform:scale(1.12)}
+  .node.visited{opacity:.45}
+  .node.current{border-color:var(--good);box-shadow:0 0 16px rgba(95,207,128,.6)}
+  .node.locked{opacity:.35}
+  @keyframes pulse{0%,100%{box-shadow:0 0 8px rgba(232,196,104,.35)}50%{box-shadow:0 0 18px rgba(232,196,104,.7)}}
+  .card.selected{outline:3px solid var(--gold);outline-offset:2px;transform:translateY(-6px)}
+  .remove-bar{margin:18px auto 0;display:flex;gap:12px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--gold);border-radius:10px;padding:10px 16px;max-width:560px}
+  .upgrade-bar{margin:18px auto 0;display:flex;gap:12px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--gold);border-radius:10px;padding:10px 16px;max-width:560px}
+  .map-hint{text-align:center;color:var(--dim);font-size:13px;padding:10px 12px}
+
+  /* ===== Battle ===== */
+  .battle{flex:1;display:flex;flex-direction:column;min-height:0}
+  .arena{flex:1;display:flex;justify-content:space-between;align-items:flex-end;padding:20px 40px 120px;position:relative;min-height:0}
+  .enemies{display:flex;gap:34px;align-items:flex-end}
+  .enemy{display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:.12s}
+  .enemy .sprite{width:104px;height:104px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+    font-size:54px;background:linear-gradient(180deg,#2c2030,#1a1622);border:2px solid var(--line)}
+  .enemy.targeted .sprite{border-color:var(--atk);box-shadow:0 0 18px rgba(226,96,79,.6);transform:translateY(-4px)}
+  .enemy.dead{display:none}
+  .ename{font-size:13px;color:var(--dim)}
+  .ebar{width:104px;height:12px;background:#3a1f27;border-radius:7px;overflow:hidden;position:relative;border:1px solid #5a2f3a}
+  .ebar>div{height:100%;background:linear-gradient(90deg,#e0566b,#f08a98)}
+  .ebar span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;text-shadow:0 1px 2px #000}
+  .intent{font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:3px 10px;display:flex;gap:5px;align-items:center}
+  .blkbadge{font-size:12px;color:var(--block);display:flex;align-items:center;gap:3px}
+  .statuses{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:120px}
+  .st{font-size:11px;background:#0008;border:1px solid var(--line);border-radius:6px;padding:1px 5px;display:inline-flex;gap:3px;align-items:center;cursor:help;transition:.12s}
+  .st.buff{border-color:rgba(95,207,128,.6);color:#cdeccc}
+  .st.debuff{border-color:rgba(226,96,79,.6);color:#f0c4bd}
+  .st:hover{filter:brightness(1.3)}
+
+  .player-side{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .psprite{width:110px;height:120px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+    font-size:56px;background:linear-gradient(180deg,#20303a,#16222a);border:2px solid var(--line)}
+  .pstats{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:160px}
+
+  /* hand */
+  .handzone{display:flex;align-items:flex-end;justify-content:center;gap:12px;padding:8px 14px 18px;min-height:230px;position:relative}
+  .card{
+    width:132px;height:188px;border-radius:14px;background:linear-gradient(180deg,#2b2f44,#1c2030);
+    border:1px solid var(--line);position:relative;display:flex;flex-direction:column;
+    transition:.14s;cursor:pointer;overflow:hidden;flex-shrink:0;
+  }
+  .card:hover{transform:translateY(-18px) scale(1.04);z-index:5;box-shadow:0 14px 30px #000a}
+  .card.unplayable{opacity:.55}
+  .card{touch-action:none;cursor:grab}
+  .card.dragging{transition:none;box-shadow:0 22px 46px #000d;cursor:grabbing;transform:scale(1.05);z-index:85}
+  .enemy.aim .sprite{border-color:var(--good);box-shadow:0 0 20px rgba(95,207,128,.7);transform:translateY(-4px)}
+  .card.play-anim{animation:cardFly .35s ease-in forwards}
+  .card .cost{position:absolute;top:-2px;left:-2px;width:34px;height:34px;border-radius:0 0 14px 0;
+    background:radial-gradient(circle at 40% 40%,#ffe08a,#e0a52e);color:#1a1208;font-weight:800;
+    display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 2px 6px #0007}
+  .card .topbar-c{height:5px}
+  .card.atk .topbar-c{background:var(--atk)} .card.skill .topbar-c{background:var(--skill)} .card.power .topbar-c{background:var(--power)}
+  .card .cname{font-size:14px;text-align:center;padding:8px 4px 4px;font-weight:600}
+  .card .cart{font-size:40px;text-align:center;padding:2px 0}
+  .card .cdesc{font-size:11.5px;line-height:1.45;padding:4px 9px;color:#d3d7ec;flex:1}
+  .card .cdesc b{color:#fff}
+  .card .up{position:absolute;top:4px;right:6px;color:var(--gold);font-size:12px}
+  .card .ctype{font-size:10px;text-align:center;color:var(--dim);padding-bottom:6px}
+
+  .bottombar{display:flex;align-items:center;gap:18px;padding:10px 24px;background:var(--panel);border-top:1px solid var(--line)}
+  .energy{width:64px;height:64px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 40% 35%,#ffe08a,#caa030);color:#231804;font-weight:800;box-shadow:0 0 16px rgba(243,195,78,.4)}
+  .energy .n{font-size:22px;line-height:1} .energy .t{font-size:10px}
+  .pile{font-size:13px;color:var(--dim);display:flex;flex-direction:column;align-items:center;min-width:58px;
+    cursor:pointer;padding:5px 9px;border-radius:10px;border:1px solid transparent;transition:.12s;user-select:none}
+  .pile:hover{border-color:var(--gold);background:var(--panel2);color:var(--txt);transform:translateY(-2px)}
+  .pile b{color:var(--txt);font-size:16px}
+  .pile.zero{opacity:.45}
+
+  /* ===== 遗物栏（醒目） ===== */
+  .relicbar{display:flex;align-items:center;gap:10px;padding:9px 18px;flex-wrap:wrap;
+    background:linear-gradient(180deg,#2a2338 0%,#1c1826 100%);border-bottom:1px solid #4a415f;
+    box-shadow:inset 0 -2px 10px rgba(232,196,104,.10)}
+  .relicbar .rlbl{font-size:12px;color:var(--gold);letter-spacing:2px;border:1px solid var(--gold);
+    border-radius:6px;padding:3px 9px;background:rgba(232,196,104,.08);white-space:nowrap}
+  .relicchip{position:relative;display:flex;align-items:center;gap:6px;
+    background:linear-gradient(180deg,#40365c,#272138);border:1px solid var(--gold);border-radius:22px;
+    padding:4px 13px 4px 7px;cursor:help;box-shadow:0 0 11px rgba(232,196,104,.28);transition:.15s}
+  .relicchip:hover{transform:translateY(-3px);box-shadow:0 0 20px rgba(232,196,104,.6);border-color:#ffe6a8}
+  .relicchip .ri{font-size:21px;filter:drop-shadow(0 0 5px rgba(232,196,104,.7))}
+  .relicchip .rn{font-size:12.5px;color:#f4e7c4;white-space:nowrap}
+  .relicchip .tip{position:absolute;top:118%;left:50%;transform:translateX(-50%);width:230px;
+    background:#0d0f18;border:1px solid var(--gold);border-radius:9px;padding:9px 12px;font-size:12px;
+    color:var(--txt);line-height:1.55;z-index:88;opacity:0;pointer-events:none;transition:.15s;
+    box-shadow:0 10px 26px #000c}
+  .relicchip:hover .tip{opacity:1}
+  .relicchip .tip b{color:var(--gold)}
+  .relicchip.empty{border-style:dashed;border-color:var(--line);box-shadow:none;cursor:default;background:none}
+  .relicchip.empty .rn{color:var(--dim)}
+  .relicchip.empty:hover{transform:none;box-shadow:none;border-color:var(--line)}
+
+  /* ===== 牌堆浏览弹层 ===== */
+  .modal{position:fixed;inset:0;background:rgba(5,6,12,.82);z-index:95;display:flex;align-items:center;justify-content:center;padding:22px}
+  .mpanel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 22px;
+    max-width:1040px;width:100%;max-height:88vh;display:flex;flex-direction:column;gap:14px;box-shadow:0 24px 60px #000c}
+  .mpanel .mhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .mpanel .mhead h2{font-size:20px;letter-spacing:2px;margin:0}
+  .mpanel .mhead .note{color:var(--dim);font-size:12.5px}
+  .mgrid{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;overflow:auto;padding:4px 2px}
+  .card.small{width:116px;height:166px;cursor:default}
+  .card.small:hover{transform:translateY(-8px) scale(1.03)}
+  .card.small .cart{font-size:32px;padding:1px 0}
+  .card.small .cname{font-size:13px;padding:6px 3px 3px}
+  .card.small .cdesc{font-size:10.5px;padding:3px 7px;line-height:1.4}
+  .card.small .ctype{font-size:9.5px;padding-bottom:5px}
+  .mempty{color:var(--dim);font-size:14px;text-align:center;padding:30px 0}
+
+  /* overlays */
+  .overlay{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;padding:24px;overflow:auto}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px 30px;max-width:780px;width:100%}
+  .panel h2{font-size:24px;margin-bottom:6px;letter-spacing:2px}
+  .panel .desc{color:var(--dim);font-size:13px;margin-bottom:18px;line-height:1.7}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .reward-card{cursor:pointer}
+  .reward-card:hover{transform:translateY(-8px);border-color:var(--gold)}
+  .shop-item{display:flex;flex-direction:column;gap:8px;align-items:center;background:var(--panel2);
+    border:1px solid var(--line);border-radius:12px;padding:12px;min-width:150px}
+  .shop-item .pr{color:var(--gold);font-size:14px}
+  .relic{display:flex;gap:12px;align-items:center;background:var(--panel2);border:1px solid var(--line);
+    border-radius:12px;padding:12px 16px;width:100%}
+  .relic .ri{font-size:30px}
+  .relic .rn{font-weight:700;font-size:15px}
+  .relic .rd{font-size:12px;color:var(--dim);line-height:1.5}
+  .evt-opt{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;padding:14px 18px}
+  .evt-opt small{color:var(--dim);font-size:12px}
+  .center{text-align:center}
+  .big{font-size:40px;letter-spacing:4px}
+  #tipbox{position:fixed;z-index:96;max-width:250px;background:#0d0f18;border:1px solid var(--gold);border-radius:9px;padding:9px 12px;font-size:12.5px;line-height:1.55;color:var(--txt);box-shadow:0 10px 26px #000c;pointer-events:none;opacity:0;transform:translateY(4px);transition:.12s;display:none}
+  #tipbox.show{opacity:1;display:block;transform:translateY(0)}
+  #tipbox b{color:var(--gold)}
+  .iintent{cursor:help}
+  .logcenter{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;z-index:20;pointer-events:none;
+    width:min(660px,76%);max-height:104px;overflow:hidden;
+    background:rgba(13,15,24,.34);border:none;border-radius:12px;padding:7px 16px 9px;text-align:center}
+  .logcenter .lhead{font-size:11px;letter-spacing:5px;color:var(--gold);opacity:.7;margin-bottom:4px;font-weight:700}
+  .logcenter .lbody{display:flex;flex-direction:column;align-items:center;gap:3px}
+  .logline{font-size:15px;color:#cdd2e8;line-height:1.32;opacity:.78;padding:1px 0}
+  .logline.fresh{font-size:22px;font-weight:800;color:#fff;opacity:1;letter-spacing:.5px;
+    text-shadow:0 0 12px rgba(232,196,104,.55);animation:logIn .42s ease}
+  @keyframes logIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .codex-scroll{max-height:70vh;overflow:auto;padding-right:4px}
+  .cgroup h3{font-size:14px;color:var(--gold);margin:16px 0 8px;letter-spacing:1px;border-bottom:1px solid var(--line);padding-bottom:5px}
+  .cgroup:first-child h3{margin-top:4px}
+  .toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#000c;border:1px solid var(--gold);
+    color:var(--gold);padding:8px 18px;border-radius:20px;font-size:14px;z-index:70;animation:fade 1.8s forwards}
+  @keyframes fade{0%{opacity:0;transform:translate(-50%,-10px)}15%{opacity:1;transform:translate(-50%,0)}80%{opacity:1}100%{opacity:0}}
+  @keyframes floatUp{0%{opacity:0;transform:translate(-50%,0) scale(.7)}15%{opacity:1;transform:translate(-50%,-14px) scale(1.1)}100%{opacity:0;transform:translate(-50%,-70px) scale(1)}}
+  .float{position:absolute;font-weight:800;font-size:26px;text-shadow:0 2px 4px #000;transform:translate(-50%,0);animation:floatUp .9s forwards;pointer-events:none}
+  @keyframes shake{0%,100%{transform:translate(0,0)}20%{transform:translate(-7px,3px)}40%{transform:translate(6px,-3px)}60%{transform:translate(-5px,2px)}80%{transform:translate(4px,-2px)}}
+  .shake{animation:shake .32s}
+  .hit-flash{animation:hitFlash .25s}
+  @keyframes hitFlash{0%{filter:brightness(2.2) saturate(1.6)}100%{filter:none}}
+  .mutebtn{font-size:16px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 9px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="fx"></div>
+<div id="tipbox"></div>
+<svg id="arrowLayer"></svg>
+<script>
+"use strict";
+/* ===================== 工具 ===================== */
+const $ = s => document.querySelector(s);
+const rng = n => Math.floor(Math.random()*n);
+// 深度系数：随层数从前期（便宜/少）平滑过渡到后期（贵/多）
+function depthScale(floor){
+  const N=(state&&state.map)?state.map.N:10;
+  const t=N>1?Math.max(0,Math.min(1,floor/(N-1))):0;
+  return 0.7+0.9*t;   // floor0≈0.70 → floor(N-1)≈1.60
+}
+const pick = a => a[rng(a.length)];
+const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi,v));
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=rng(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;}
+function fmt(n){return n>0?'+'+n:(n<0?''+n:'0');}
+
+/* ===================== 音效（Web Audio 合成） ===================== */
+let actx=null, muted=false;
+function audio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } return actx; }
+function unlockAudio(){ const a=audio(); if(a && a.state==='suspended'){ a.resume().catch(()=>{}); } }
+function tone(freq,dur,type,vol,slideTo){
+  if(muted)return; const a=audio(); if(!a)return;
+  try{
+    const o=a.createOscillator(), g=a.createGain();
+    o.type=type||'sine'; o.frequency.setValueAtTime(freq,a.currentTime);
+    if(slideTo)o.frequency.exponentialRampToValueAtTime(Math.max(1,slideTo),a.currentTime+dur);
+    g.gain.setValueAtTime(vol||0.12,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0008,a.currentTime+dur);
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+dur+0.02);
+  }catch(e){}
+}
+function noiseBurst(dur,vol){
+  if(muted)return; const a=audio(); if(!a)return;
+  try{
+    const n=a.sampleRate*dur, buf=a.createBuffer(1,n,a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
+    const s=a.createBufferSource(); s.buffer=buf;
+    const g=a.createGain(); g.gain.setValueAtTime(vol||0.12,a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,a.currentTime+dur);
+    s.connect(g); g.connect(a.destination); s.start();
+  }catch(e){}
+}
+const SFX={
+  card(){ tone(520,0.07,'triangle',0.10,740); },
+  hit(){ noiseBurst(0.10,0.16); tone(150,0.12,'square',0.10,80); },
+  bigHit(){ noiseBurst(0.16,0.20); tone(110,0.18,'square',0.12,60); },
+  block(){ tone(320,0.09,'square',0.10,520); },
+  buff(){ tone(440,0.12,'sine',0.11,680); },
+  debuff(){ tone(300,0.14,'sawtooth',0.09,170); },
+  coin(){ tone(880,0.06,'square',0.09,1250); },
+  click(){ tone(420,0.05,'triangle',0.07); },
+  discard(){ tone(300,0.09,'triangle',0.09,180); setTimeout(()=>tone(240,0.10,'triangle',0.07,140),70); },
+  shuffle(){ noiseBurst(0.22,0.10); },
+  win(){ tone(523,0.12,'triangle',0.13); setTimeout(()=>tone(659,0.12,'triangle',0.13),110); setTimeout(()=>tone(784,0.22,'triangle',0.13),230); },
+  lose(){ tone(330,0.2,'sawtooth',0.11,210); setTimeout(()=>tone(220,0.32,'sawtooth',0.11,110),150); },
+  select(){ tone(600,0.05,'sine',0.07); },
+};
+function toggleMute(){ muted=!muted; if(!muted)unlockAudio(); render(); }
+
+/* ===================== 特效层 ===================== */
+let fxQ=[];
+function floatText(sel,text,color){ fxQ.push({sel,text,color}); }
+function processFx(){
+  const fx=document.getElementById('fx'); if(!fx)return;
+  while(fxQ.length){
+    const f=fxQ.shift();
+    let el=null;
+    try{ el=document.querySelector(f.sel); }catch(e){}
+    if(!el)continue;
+    const r=el.getBoundingClientRect();
+    const d=document.createElement('div');
+    d.className='float'; d.textContent=f.text; d.style.color=f.color;
+    d.style.left=(r.left+r.width/2)+'px';
+    d.style.top=(r.top+r.height*0.35)+'px';
+    fx.appendChild(d); setTimeout(()=>{ if(d.parentNode)d.parentNode.removeChild(d); },920);
+  }
+  bindTips();
+}
+let tipPinned=null;
+function bindTips(){
+  const box=document.getElementById('tipbox'); if(!box)return;
+  const els=document.querySelectorAll('[data-tip]');
+  els.forEach(el=>{
+    const tip=el.getAttribute('data-tip')||'';
+    el.onmouseenter=()=>{ if(tipPinned)return; box.innerHTML=tip; box.classList.add('show'); positionTip(el); };
+    el.onmousemove=()=>{ if(tipPinned)return; positionTip(el); };
+    el.onmouseleave=()=>{ if(tipPinned)return; box.classList.remove('show'); };
+    el.onclick=(ev)=>{ ev.stopPropagation(); if(tipPinned===el){ box.classList.remove('show'); tipPinned=null; } else { box.innerHTML=tip; box.classList.add('show'); positionTip(el); tipPinned=el; } };
+  });
+}
+function positionTip(el){
+  const box=document.getElementById('tipbox'); if(!box)return;
+  const r=el.getBoundingClientRect();
+  let x=r.left, y=r.bottom+8, bw=250, bh=120;
+  if(x+bw>window.innerWidth-8)x=Math.max(8,window.innerWidth-bw-8);
+  if(y+bh>window.innerHeight-8)y=Math.max(8,r.top-bh-8);
+  box.style.left=x+'px'; box.style.top=y+'px';
+}
+function shakeScreen(){ const app=document.getElementById('app'); if(!app)return; app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake'); }
+function flashEl(sel){ const el=document.querySelector(sel); if(!el)return; el.classList.remove('hit-flash'); void el.offsetWidth; el.classList.add('hit-flash'); }
+
+/* ===================== 卡牌定义 ===================== */
+// base/up 为数值对象；play(d,c) 执行效果。cls 仅用于归类展示。
+const CARDS = {
+  /* ---- 战士基础 ---- */
+  strike:{name:'打击',type:'attack',cost:1,rarity:'starter',art:'🗡️',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害。`, base:{dmg:6}, up:{dmg:9},
+    play:(d,c)=>c.attack(d.dmg)},
+  defend:{name:'防御',type:'skill',cost:1,rarity:'starter',art:'🛡️',cls:'warrior',
+    desc:d=>`获得 <b>${d.block}</b> 点护甲。`, base:{block:5}, up:{block:8},
+    play:(d,c)=>c.block(d.block)},
+  bash:{name:'重创',type:'attack',cost:2,rarity:'starter',art:'🔨',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害，施加 <b>${d.vuln}</b> 层易伤。`, base:{dmg:8,vuln:2}, up:{dmg:10,vuln:3},
+    play:(d,c)=>{c.attack(d.dmg);c.enemyStatus('vulnerable',d.vuln);}},
+
+  /* ---- 战士通用池 ---- */
+  ironwave:{name:'铁浪',type:'attack',cost:1,rarity:'common',art:'🌊',cls:'warrior',
+    desc:d=>`获得 <b>${d.block}</b> 护甲，造成 <b>${d.dmg}</b> 伤害。`, base:{block:5,dmg:5}, up:{block:7,dmg:7},
+    play:(d,c)=>{c.block(d.block);c.attack(d.dmg);}},
+  cleave:{name:'旋风斩',type:'attack',cost:1,rarity:'common',art:'🌀',cls:'warrior',
+    desc:d=>`对所有敌人造成 <b>${d.dmg}</b> 点伤害。`, base:{dmg:8}, up:{dmg:11},
+    play:(d,c)=>c.attackAll(d.dmg)},
+  pommel:{name:'战争践踏',type:'attack',cost:1,rarity:'common',art:'⚔️',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，抽 <b>1</b> 张牌。`, base:{dmg:9}, up:{dmg:12},
+    play:(d,c)=>{c.attack(d.dmg);c.draw(1);}},
+  toxic:{name:'毒刃',type:'attack',cost:1,rarity:'common',art:'🟢',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，施加 <b>${d.poison}</b> 层中毒。`, base:{dmg:5,poison:3}, up:{dmg:7,poison:4},
+    play:(d,c)=>{c.attack(d.dmg);c.enemyStatus('poison',d.poison);}},
+  rampart:{name:'壁垒',type:'skill',cost:1,rarity:'common',art:'🧱',cls:'warrior',
+    desc:d=>`获得 <b>${d.block}</b> 护甲，抽 <b>1</b> 张牌。`, base:{block:8}, up:{block:11},
+    play:(d,c)=>{c.block(d.block);c.draw(1);}},
+  twin:{name:'双重打击',type:'attack',cost:1,rarity:'common',art:'⚡',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害两次。`, base:{dmg:5}, up:{dmg:7},
+    play:(d,c)=>{c.attack(d.dmg);c.attack(d.dmg);}},
+  spark:{name:'火花',type:'skill',cost:1,rarity:'common',art:'✨',cls:'warrior',
+    desc:d=>`对目标施加 <b>${d.vuln}</b> 层易伤。`, base:{vuln:2}, up:{vuln:3},
+    play:(d,c)=>c.enemyStatus('vulnerable',d.vuln)},
+
+  bodyslam:{name:'全身撞击',type:'attack',cost:1,rarity:'uncommon',art:'💥',cls:'warrior',
+    desc:d=>`造成等同于当前护甲的伤害。`, base:{}, up:{},
+    play:(d,c)=>c.attack(state.player.block)},
+  heavyblade:{name:'重剑',type:'attack',cost:2,rarity:'uncommon',art:'🗡️',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，力量加成翻倍。`, base:{dmg:14}, up:{dmg:18},
+    play:(d,c)=>c.attack(d.dmg,true)},
+  whirlwind:{name:'裂地',type:'attack',cost:2,rarity:'uncommon',art:'🌪️',cls:'warrior',
+    desc:d=>`对所有敌人造成 <b>${d.dmg}</b> 伤害。`, base:{dmg:11}, up:{dmg:15},
+    play:(d,c)=>c.attackAll(d.dmg)},
+  bloodletting:{name:'燃血',type:'skill',cost:0,rarity:'uncommon',art:'🩸',cls:'warrior',
+    desc:d=>`失去 <b>3</b> 点生命，获得 <b>2</b> 能量。`, base:{}, up:{},
+    play:(d,c)=>{c.damageSelf(3);c.energy(2);}},
+  anger:{name:'狂怒',type:'attack',cost:0,rarity:'uncommon',art:'😡',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害。`, base:{dmg:6}, up:{dmg:9},
+    play:(d,c)=>c.attack(d.dmg)},
+  offering:{name:'献祭',type:'skill',cost:0,rarity:'uncommon',art:'🕯️',cls:'warrior',
+    desc:d=>`失去 <b>${d.lose}</b> 点生命，抽 <b>3</b> 张牌，获得 <b>2</b> 能量。`, base:{lose:6}, up:{lose:6},
+    play:(d,c)=>{c.damageSelf(d.lose);c.draw(3);c.energy(2);}},
+  immolate:{name:'焚尽',type:'attack',cost:2,rarity:'uncommon',art:'🔥',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，施加 <b>${d.burn}</b> 层易伤。`, base:{dmg:12,burn:2}, up:{dmg:16,burn:3},
+    play:(d,c)=>{c.attack(d.dmg);c.enemyStatus('vulnerable',d.burn);}},
+
+  demonform:{name:'恶魔形态',type:'power',cost:3,rarity:'rare',art:'👹',cls:'warrior',
+    desc:d=>`每回合开始获得 <b>${d.str}</b> 点力量。`, base:{str:2}, up:{str:3},
+    play:(d,c)=>c.playerStatus('demonform',d.str)},
+  core:{name:'战吼核心',type:'power',cost:1,rarity:'rare',art:'⚙️',cls:'warrior',
+    desc:d=>`每回合开始获得 <b>${d.eng}</b> 点能量。`, base:{eng:1}, up:{eng:1},
+    play:(d,c)=>c.playerStatus('coreenergy',d.eng)},
+  fury:{name:'不屈之怒',type:'power',cost:1,rarity:'rare',art:'🔥',cls:'warrior',
+    desc:d=>`每回合开始获得 <b>${d.blk}</b> 点护甲。`, base:{blk:3}, up:{blk:4},
+    play:(d,c)=>c.playerStatus('fury',d.blk)},
+  reaper:{name:'收割',type:'attack',cost:2,rarity:'rare',art:'☠️',cls:'warrior',
+    desc:d=>`对所有敌人造成 <b>${d.dmg}</b> 伤害，并按伤害回复生命。`, base:{dmg:9}, up:{dmg:12},
+    play:(d,c)=>{state.battle.enemies.filter(e=>e.hp>0).forEach(e=>{const a=c.calcAttack(d.dmg);const before=e.hp;c.rawDeal(e,a);state.player.hp=clamp(state.player.hp+(before-e.hp),0,state.player.maxHp);});}},
+
+  /* ---- 战士新增 ---- */
+  pummel:{name:'连击',type:'attack',cost:1,rarity:'common',art:'👊',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害 <b>${d.times}</b> 次。`, base:{dmg:2,times:4}, up:{dmg:3,times:4},
+    play:(d,c)=>{for(let i=0;i<d.times;i++)c.attack(d.dmg);}},
+  thunderclap:{name:'雷霆震慑',type:'skill',cost:1,rarity:'common',art:'⚡',cls:'warrior',
+    desc:d=>`获得 <b>${d.block}</b> 护甲，对所有敌人施加 <b>${d.weak}</b> 层虚弱。`, base:{block:5,weak:1}, up:{block:7,weak:2},
+    play:(d,c)=>{c.block(d.block);c.enemyStatusAll('weak',d.weak);}},
+  reckless:{name:'亡命一击',type:'attack',cost:0,rarity:'uncommon',art:'💢',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，失去 <b>2</b> 生命。`, base:{dmg:7}, up:{dmg:10},
+    play:(d,c)=>{c.attack(d.dmg);c.damageSelf(2);}},
+  juggernaut:{name:'钢铁意志',type:'power',cost:2,rarity:'rare',art:'🛡️',cls:'warrior',
+    desc:d=>`每回合开始获得 <b>${d.str}</b> 点力量。`, base:{str:2}, up:{str:3},
+    play:(d,c)=>c.playerStatus('juggernaut',d.str)},
+  overwhelm:{name:'碾压',type:'attack',cost:2,rarity:'uncommon',art:'🪓',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，施加 <b>${d.vuln}</b> 层易伤。`, base:{dmg:14,vuln:2}, up:{dmg:18,vuln:3},
+    play:(d,c)=>{c.attack(d.dmg);c.enemyStatus('vulnerable',d.vuln);}},
+
+  /* ---- 游侠基础 ---- */
+  shoot:{name:'射击',type:'attack',cost:1,rarity:'starter',art:'🏹',cls:'hunter',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害。`, base:{dmg:5}, up:{dmg:8},
+    play:(d,c)=>c.attack(d.dmg)},
+  dodge:{name:'闪避',type:'skill',cost:1,rarity:'starter',art:'💨',cls:'hunter',
+    desc:d=>`获得 <b>${d.block}</b> 点护甲。`, base:{block:5}, up:{block:8},
+    play:(d,c)=>c.block(d.block)},
+  venom:{name:'淬毒之击',type:'attack',cost:1,rarity:'starter',art:'🟣',cls:'hunter',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，施加 <b>${d.poison}</b> 层中毒。`, base:{dmg:4,poison:2}, up:{dmg:6,poison:3},
+    play:(d,c)=>{c.attack(d.dmg);c.enemyStatus('poison',d.poison);}},
+
+  /* ---- 游侠通用池 ---- */
+  quickdraw:{name:'速射',type:'attack',cost:1,rarity:'common',art:'🎯',cls:'hunter',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害两次。`, base:{dmg:4}, up:{dmg:6},
+    play:(d,c)=>{c.attack(d.dmg);c.attack(d.dmg);}},
+  poisondart:{name:'毒镖',type:'attack',cost:1,rarity:'common',art:'🟢',cls:'hunter',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，施加 <b>${d.poison}</b> 层中毒。`, base:{dmg:3,poison:3}, up:{dmg:4,poison:4},
+    play:(d,c)=>{c.attack(d.dmg);c.enemyStatus('poison',d.poison);}},
+  sidestep:{name:'侧步',type:'skill',cost:1,rarity:'common',art:'🤸',cls:'hunter',
+    desc:d=>`获得 <b>${d.block}</b> 护甲，抽 <b>1</b> 张牌。`, base:{block:6}, up:{block:9},
+    play:(d,c)=>{c.block(d.block);c.draw(1);}},
+  evasion:{name:'规避',type:'skill',cost:1,rarity:'common',art:'🌫️',cls:'hunter',
+    desc:d=>`获得 <b>${d.block}</b> 护甲，获得 <b>${d.dex}</b> 点敏捷。`, base:{block:5,dex:1}, up:{block:7,dex:2},
+    play:(d,c)=>{c.block(d.block);c.playerStatus('dexterity',d.dex);}},
+  volley:{name:'齐射',type:'attack',cost:2,rarity:'common',art:'🏹',cls:'hunter',
+    desc:d=>`对所有敌人造成 <b>${d.dmg}</b> 伤害。`, base:{dmg:6}, up:{dmg:9},
+    play:(d,c)=>c.attackAll(d.dmg)},
+
+  envenom:{name:'施毒',type:'skill',cost:1,rarity:'uncommon',art:'🧪',cls:'hunter',
+    desc:d=>`对目标施加 <b>${d.poison}</b> 层中毒，抽 <b>1</b> 张牌。`, base:{poison:3}, up:{poison:4},
+    play:(d,c)=>{c.enemyStatus('poison',d.poison);c.draw(1);}},
+  deadly:{name:'致命一击',type:'attack',cost:1,rarity:'uncommon',art:'🗡️',cls:'hunter',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害；若目标中毒，额外造成等同其中毒层数的伤害。`, base:{dmg:8}, up:{dmg:11},
+    play:(d,c)=>{const e=tgtEnemy();const p=e&&e.hp>0?e.statuses.poison||0:0;c.attack(d.dmg);if(p>0)c.attack(p);}},
+  caltrops:{name:'尖刺陷阱',type:'skill',cost:1,rarity:'uncommon',art:'🪤',cls:'hunter',
+    desc:d=>`获得 <b>${d.dex}</b> 点敏捷。`, base:{dex:3}, up:{dex:4},
+    play:(d,c)=>c.playerStatus('dexterity',d.dex)},
+  reflex:{name:'反射',type:'skill',cost:0,rarity:'uncommon',art:'🌀',cls:'hunter',
+    desc:d=>`获得 <b>${d.block}</b> 护甲，抽 <b>2</b> 张牌。`, base:{block:3}, up:{block:5},
+    play:(d,c)=>{c.block(d.block);c.draw(2);}},
+  noxious:{name:'剧毒喷射',type:'attack',cost:2,rarity:'uncommon',art:'☠️',cls:'hunter',
+    desc:d=>`对所有敌人施加 <b>${d.poison}</b> 层中毒。`, base:{poison:4}, up:{poison:6},
+    play:(d,c)=>c.enemyStatusAll('poison',d.poison)},
+  cheapshot:{name:'偷袭',type:'attack',cost:0,rarity:'uncommon',art:'👊',cls:'hunter',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，施加 <b>${d.weak}</b> 层虚弱。`, base:{dmg:6,weak:1}, up:{dmg:9,weak:2},
+    play:(d,c)=>{c.attack(d.dmg);c.enemyStatus('weak',d.weak);}},
+
+  deathmark:{name:'死亡印记',type:'power',cost:1,rarity:'rare',art:'💀',cls:'hunter',
+    desc:d=>`每回合开始，对所有敌人施加 <b>${d.poison}</b> 层中毒。`, base:{poison:1}, up:{poison:2},
+    play:(d,c)=>c.playerStatus('deathmark',d.poison)},
+  shadowstep:{name:'影步',type:'power',cost:2,rarity:'rare',art:'🌑',cls:'hunter',
+    desc:d=>`每回合开始获得 <b>${d.dex}</b> 点敏捷。`, base:{dex:2}, up:{dex:3},
+    play:(d,c)=>c.playerStatus('shadowstep',d.dex)},
+  venomstorm:{name:'毒暴',type:'attack',cost:3,rarity:'rare',art:'🌪️',cls:'hunter',
+    desc:d=>`对所有敌人造成 <b>${d.dmg}</b> 伤害并施加 <b>${d.poison}</b> 层中毒。`, base:{dmg:8,poison:5}, up:{dmg:12,poison:7},
+    play:(d,c)=>{c.attackAll(d.dmg);c.enemyStatusAll('poison',d.poison);}},
+  assassinate:{name:'刺杀',type:'attack',cost:2,rarity:'rare',art:'🔪',cls:'hunter',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，无视护甲。`, base:{dmg:20}, up:{dmg:28},
+    play:(d,c)=>c.attackPierce(d.dmg)},
+
+  /* ---- 中立卡（两职业通用） ---- */
+  secondwind:{name:'喘息',type:'skill',cost:1,rarity:'uncommon',art:'🌬️',cls:'neutral',
+    desc:d=>`失去 <b>3</b> 生命，抽 <b>${d.draw}</b> 张牌。`, base:{draw:2}, up:{draw:3},
+    play:(d,c)=>{c.damageSelf(3);c.draw(d.draw);}},
+  rage:{name:'暴怒',type:'power',cost:1,rarity:'uncommon',art:'🔥',cls:'neutral',
+    desc:d=>`每回合开始获得 <b>1</b> 点力量，但失去 <b>${d.lose}</b> 生命。`, base:{lose:2}, up:{lose:1},
+    play:(d,c)=>{c.playerStatus('rage',d.lose);}},
+};
+
+/* ===================== 职业定义 ===================== */
+const CLASSES = {
+  warrior:{
+    id:'warrior', name:'铁甲战士', art:'🦸', maxHp:72, startRelic:'burningBlood',
+    blurb:'力量与护甲的钢铁洪流。重击、格挡、恶魔形态，正面碾压一切敌人。',
+    deck:[['strike',5],['defend',4],['bash',1]],
+    pool:{
+      common:['ironwave','cleave','pommel','toxic','rampart','twin','spark','pummel','thunderclap'],
+      uncommon:['bodyslam','heavyblade','whirlwind','bloodletting','anger','offering','immolate','reckless','overwhelm','secondwind','rage'],
+      rare:['demonform','core','fury','reaper','juggernaut'],
+    },
+  },
+  hunter:{
+    id:'hunter', name:'暗影游侠', art:'🏹', maxHp:60, startRelic:'poisonVial',
+    blurb:'剧毒与敏捷的暗影猎手。毒刃、连射、闪避，于无形中腐蚀强敌。',
+    deck:[['shoot',5],['dodge',4],['venom',1]],
+    pool:{
+      common:['quickdraw','poisondart','sidestep','evasion','volley','toxic'],
+      uncommon:['envenom','deadly','caltrops','reflex','noxious','cheapshot','secondwind','rage'],
+      rare:['deathmark','shadowstep','venomstorm','assassinate'],
+    },
+  },
+};
+function classPool(cls,rarity){ return (CLASSES[cls]&&CLASSES[cls].pool[rarity])||[]; }
+
+/* ===================== 敌人定义 ===================== */
+// ai(e, turn) -> intent; intent.type: attack|defend|buff|debuff|attack_def|attack_debuff|multi
+const ENEMIES = {
+  /* 普通 */
+  slime:{name:'酸液史莱姆',hp:28,art:'🟢',
+    ai(e,t){const m=t%3; if(m===0)return{type:'attack',val:7}; if(m===1)return{type:'attack',val:11}; return{type:'attack_debuff',val:5,status:'weak',st:1};}},
+  jaw:{name:'噬咬兽',hp:22,art:'🦖',
+    ai(e,t){return t===0?{type:'buff',val:3}:{type:'attack',val:10};}},
+  cultist:{name:'血祭徒',hp:18,art:'🧙',
+    ai(e,t){return t===0?{type:'buff',val:3}:{type:'attack',val:6};}},
+  louse:{name:'赤甲虫',hp:13,art:'🐛',
+    ai(e,t){return t%2===0?{type:'attack',val:5}:{type:'defend',val:6};}},
+  bat:{name:'噬魂蝠',hp:20,art:'🦇',
+    ai(e,t){return t%2===0?{type:'attack',val:6}:{type:'attack_debuff',val:4,status:'weak',st:1};}},
+  spore:{name:'孢菌怪',hp:16,art:'🍄',
+    ai(e,t){return t%2===0?{type:'defend',val:5}:{type:'attack_debuff',val:4,status:'vulnerable',st:1};}},
+  /* 精英 */
+  nob:{name:'狂暴石魔',hp:82,art:'👹',elite:true,
+    ai(e,t){return t%2===0?{type:'attack',val:14}:{type:'attack_debuff',val:10,status:'vulnerable',st:2};}},
+  sentinel:{name:'黄铜哨卫',hp:70,art:'🛡️',elite:true,
+    ai(e,t){return t%2===0?{type:'defend',val:14}:{type:'attack',val:16};}},
+  golem:{name:'熔岩傀儡',hp:95,art:'🌋',elite:true,
+    ai(e,t){const m=t%3; if(m===0)return{type:'attack',val:18}; if(m===1)return{type:'defend',val:18}; return{type:'attack_debuff',val:8,status:'weak',st:2};}},
+  witch:{name:'咒术师',hp:78,art:'🔮',elite:true,
+    ai(e,t){return t%2===0?{type:'attack_debuff',val:9,status:'poison',st:3}:{type:'attack',val:13};}},
+  /* BOSS */
+  guardian:{name:'熔炉守卫',hp:120,art:'🔩',boss:true,
+    ai(e,t){const m=t%3; if(m===0)return{type:'defend',val:20}; if(m===1)return{type:'attack',val:18}; return{type:'attack_debuff',val:10,status:'vulnerable',st:2};}},
+  reaper:{name:'噬时巨像',hp:150,art:'⏳',boss:true,
+    ai(e,t){return t%2===0?{type:'attack',val:22}:{type:'attack_debuff',val:12,status:'weak',st:2};}},
+  voidlord:{name:'虚空之主',hp:170,art:'🕳️',boss:true,
+    ai(e,t){const m=t%4; if(m===0)return{type:'attack',val:14}; if(m===1)return{type:'attack_debuff',val:8,status:'vulnerable',st:2}; if(m===2)return{type:'defend',val:24}; return{type:'multi',val:9,times:3};}},
+};
+const NORMAL_POOL=['slime','jaw','cultist','louse','bat','spore'];
+const ELITE_POOL=['nob','sentinel','golem','witch'];
+const BOSS_POOL=['guardian','reaper','voidlord'];
+
+/* ===================== 遗物定义 ===================== */
+const RELICS = {
+  burningBlood:{name:'燃烧之血',art:'🩸',desc:'每场战斗结束后回复 6 点生命。',
+    onBattleEnd(p){p.hp=clamp(p.hp+6,0,p.maxHp);toast('燃烧之血：回复 6 生命');}},
+  energyCore:{name:'能量核心',art:'🔋',desc:'每回合开始额外获得 1 点能量。',
+    onTurnStart(b){b.energy+=1;}},
+  vajra:{name:'金刚杵',art:'🔱',desc:'战斗开始时获得 3 点力量。',
+    onBattleStart(p){p.statuses.strength=(p.statuses.strength||0)+3;toast('金刚杵：力量 +3');}},
+  marbles:{name:'弹珠袋',art:'🔮',desc:'战斗开始时对所有敌人施加 1 层易伤。',
+    onBattleStart(b){b.enemies.forEach(e=>e.statuses.vulnerable=(e.statuses.vulnerable||0)+1);}},
+  snakeRing:{name:'灵蛇之戒',art:'🐍',desc:'每回合多抽 1 张牌。',
+    onTurnStart(b){b.drawBonus=(b.drawBonus||0)+1;}},
+  happyFlower:{name:'欢愉之花',art:'🌸',desc:'每 3 回合获得 1 点能量。',
+    onTurnStart(b){if(b.turn%3===0)b.energy+=1;}},
+  bronze:{name:'青铜鳞甲',art:'🐲',desc:'受到攻击时反弹 3 点伤害。',thorn:3},
+  medicine:{name:'急救包',art:'💊',desc:'每场战斗第一回合回复 8 点生命。',
+    onTurnStart(b){if(b.turn===1){state.player.hp=clamp(state.player.hp+8,0,state.player.maxHp);toast('急救包：回复 8 生命');}},
+    once:true},
+  /* 新增 */
+  poisonVial:{name:'毒药瓶',art:'🧪',desc:'战斗开始时对所有敌人施加 1 层中毒。',
+    onBattleStart(b){b.enemies.forEach(e=>e.statuses.poison=(e.statuses.poison||0)+1);toast('毒药瓶：施加 1 中毒');}},
+  kunai:{name:'苦无',art:'🔪',desc:'每回合开始获得 1 点敏捷。',
+    onTurnStart(b){state.player.statuses.dexterity=(state.player.statuses.dexterity||0)+1;}},
+  thornRing:{name:'尖刺护符',art:'🌵',desc:'受到攻击时反弹 5 点伤害。',thorn:5},
+  hourglass:{name:'时之沙漏',art:'⏳',desc:'每场战斗第一回合多抽 2 张牌。',
+    onTurnStart(b){if(b.turn===1)b.drawBonus=(b.drawBonus||0)+2;},once:true},
+  totem:{name:'生命图腾',art:'🪬',desc:'每回合开始回复 2 点生命。',
+    onTurnStart(b){state.player.hp=clamp(state.player.hp+2,0,state.player.maxHp);}},
+  lantern:{name:'猎魂灯',art:'🏮',desc:'你造成的所有伤害额外 +2。',dmgBonus:2},
+  bloodstone:{name:'血石',art:'🩸',desc:'每场战斗结束后回复 12 点生命（替代燃烧之血效果叠加）。',
+    onBattleEnd(p){p.hp=clamp(p.hp+12,0,p.maxHp);toast('血石：回复 12 生命');}},
+  frostCharm:{name:'冰晶护符',art:'❄️',desc:'敌人意图的攻击伤害 -2（最低 0）。',defDown:2},
+  strengthTotem:{name:'力量图腾',art:'💪',desc:'战斗开始时获得 2 点力量。',
+    onBattleStart(p){p.statuses.strength=(p.statuses.strength||0)+2;toast('力量图腾：力量 +2');}},
+};
+
+/* ===================== 事件定义 ===================== */
+const EVENTS = [
+  {name:'篝火残魂',art:'🔥',desc:'一缕残魂在篝火旁低语，它愿以余烬换你血肉，或抚慰你的伤痕。',
+    options:[
+      {label:'汲取余烬（回复 18 生命）',sub:'',act(){state.player.hp=clamp(state.player.hp+18,0,state.player.maxHp);}},
+      {label:'献祭血肉（失去 6 生命，获得 1 张「狂怒」）',sub:'',act(){state.player.hp=Math.max(1,state.player.hp-6);showCardGet('anger');}},
+    ]},
+  {name:'古老祭坛',art:'🗿',desc:'祭坛静默矗立，似在索求献祭，亦在赐予力量。',
+    options:[
+      {label:'献上鲜血（失去 8 生命，随机获得 1 件遗物）',sub:'',act(){state.player.hp=Math.max(1,state.player.hp-8);grantRandomRelic();}},
+      {label:'净化卡组（移除 1 张卡）',sub:'自选一张永久移除',act(){state.removePick=null;state.screen='remove';state.removeReturn='map';}},
+    ]},
+  {name:'流浪商人',art:'🧳',desc:'一名披斗篷的商人摊开货物，眼中闪着狡黠的光。',
+    options:[
+      {label:()=>{const c=Math.round(40*depthScale(state.map&&state.map.current?state.map.current.floor:0));return `购入未知遗物（花费 ${c} 金）`;},sub:'仅当金充足且仍有遗物可获',act(){const c=Math.round(40*depthScale(state.map&&state.map.current?state.map.current.floor:0));if(state.player.gold>=c){state.player.gold-=c;grantRandomRelic();}else toast('金币不足');}},
+      {label:'婉拒并离开',sub:'',act(){}},
+    ]},
+  {name:'受伤的旅人',art:'🤕',desc:'一名旅人倒在路边，气息奄奄。他求你施救，亦或……取走他仅存的财物。',
+    options:[
+      {label:'施救（失去 5 生命，获得 1 件随机遗物）',sub:'',act(){state.player.hp=Math.max(1,state.player.hp-5);grantRandomRelic();}},
+      {label:()=>{const g=Math.round(50*depthScale(state.map&&state.map.current?state.map.current.floor:0));return `取走财物（获得 ${g} 金）`;},sub:'',act(){const g=Math.round(50*depthScale(state.map&&state.map.current?state.map.current.floor:0));state.player.gold+=g;}},
+    ]},
+  {name:'双生石碑',art:'🪨',desc:'两座石碑遥遥相对，一者刻着力量，一者刻着敏捷。',
+    options:[
+      {label:'触摸力量碑（获得「钢铁意志」卡）',sub:'',act(){showCardGet('juggernaut');}},
+      {label:'触摸敏捷碑（获得「尖刺陷阱」卡）',sub:'',act(){showCardGet('caltrops');}},
+    ]},
+];
+
+/* ===================== 全局状态 ===================== */
+let state = null;
+function newGame(cls){
+  unlockAudio();
+  const C=CLASSES[cls]||CLASSES.warrior;
+  state = {
+    screen:'title', cls,
+    player:{cls, hp:C.maxHp,maxHp:C.maxHp,block:0,energy:3,maxEnergy:3,gold:0,
+      deck:[],relics:[C.startRelic],
+      statuses:{}},
+    map:null, battle:null, reward:null, shop:null, event:null, removeReturn:null, cardget:null,
+    selectedTarget:0, pileView:null, removePick:null, upgradePick:null, codex:false, log:[],
+  };
+  C.deck.forEach(([id,n])=>{ for(let i=0;i<n;i++) state.player.deck.push({id,upgraded:false}); });
+  state.map = genMap();
+  state.screen='map';
+  bumpStats(s=>s.runs++);
+  saveGame();
+  render();
+}
+function continueGame(){
+  unlockAudio();
+  if(loadGame()) render();
+  else { toast('没有可继续的存档'); }
+}
+
+/* ===================== 地图生成 ===================== */
+function genMap(){
+  const N=10; const floors=[];
+  for(let i=0;i<N;i++){
+    let count = (i===0||i===N-1)?(i===N-1?1:3) : clamp(2+(i%2?1:0)+rng(2),2,4);
+    const nodes=[];
+    for(let j=0;j<count;j++){
+      nodes.push({type:nodeType(i,N),next:[],visited:false,eventIndex:null,shop:null});
+    }
+    floors.push(nodes);
+  }
+  // 连线（向上）
+  for(let i=0;i<N-1;i++){
+    const nxt=floors[i+1];
+    floors[i].forEach(node=>{
+      const links=new Set();
+      links.add(rng(nxt.length));
+      if(rng(2)===0 && nxt.length>1){ let t=rng(nxt.length); links.add(t); }
+      node.next=[...links];
+    });
+    // 保证下一层每个节点都有入边
+    const covered=new Set();
+    floors[i].forEach(n=>n.next.forEach(k=>covered.add(k)));
+    for(let k=0;k<nxt.length;k++){
+      if(!covered.has(k)){
+        const src=pick(floors[i]);
+        if(!src.next.includes(k))src.next.push(k);
+      }
+    }
+  }
+  // 预生成商店/事件/精英内容
+  for(let i=0;i<N;i++){
+    floors[i].forEach(node=>{
+      if(node.type==='event') node.eventIndex=rng(EVENTS.length);
+      if(node.type==='shop') node.shop=genShop(i);
+    });
+  }
+  return {floors,N,current:null};
+}
+function nodeType(i,N){
+  if(i===N-1)return'boss';
+  if(i===0)return'battle';
+  const r=Math.random();
+  if(i>=2 && r<0.14)return'elite';
+  if(r<0.30)return'event';
+  if(r<0.40)return'shop';
+  if(r<0.55)return'rest';
+  return'battle';
+}
+function genShop(floor){
+  const cls=state.player.cls;
+  const s=depthScale(floor||0);
+  const shop={cards:[],relics:[],removeCost:Math.round(75*s)};
+  const commons=shuffle(classPool(cls,'common')).slice(0,2);
+  const uncommons=shuffle(classPool(cls,'uncommon')).slice(0,1);
+  commons.concat(uncommons).forEach(id=>shop.cards.push({id,upgraded:false,cost:Math.round((rng(40)+45)*s)}));
+  // 遗物：1 件未拥有
+  const avail=Object.keys(RELICS).filter(r=>!state.player.relics.includes(r));
+  if(avail.length)shop.relics.push({id:pick(avail),cost:Math.round((rng(60)+130)*s)});
+  return shop;
+}
+
+/* ===================== 战斗 ===================== */
+function startBattle(kind, enemyIds){
+  unlockAudio();
+  const enemies = enemyIds.map((id,k)=>{
+    const def=ENEMIES[id];
+    return {def:id,name:def.name,art:def.art,hp:def.hp,maxHp:def.hp,block:0,
+      statuses:{},intent:null,aiTurn:0,elite:def.elite,boss:def.boss,idx:k};
+  });
+  const b={
+    kind, enemies, turn:0, energy:state.player.maxEnergy, drawBonus:0,
+    drawPile:shuffle(state.player.deck.map(c=>({...c}))),
+    hand:[], discard:[], exhaust:[], busy:false, target:0,
+  };
+  state.battle=b;
+  // 遗物：战斗开始
+  state.player.relics.forEach(r=>{const R=RELICS[r];if(R.onBattleStart)R.onBattleStart(b);});
+  state.player.block=0;
+  // 敌人初始意图
+  enemies.forEach(e=>e.intent=ENEMIES[e.def].ai(e,++e.aiTurn));
+  state.screen='battle';
+  log('战斗开始！');
+  startPlayerTurn(true);
+}
+function startPlayerTurn(first){
+  const b=state.battle;
+  b.turn++;
+  state.player.block=0;
+  // 玩家中毒结算
+  if(state.player.statuses.poison){ state.player.hp-=state.player.statuses.poison; state.player.statuses.poison--; if(state.player.hp<=0){return gameOver();} }
+  b.energy=state.player.maxEnergy;
+  // 遗物回合开始
+  state.player.relics.forEach(r=>{const R=RELICS[r];if(R.onTurnStart)R.onTurnStart(b);});
+  // 持续类状态
+  if(state.player.statuses.demonform)state.player.statuses.strength=(state.player.statuses.strength||0)+state.player.statuses.demonform;
+  if(state.player.statuses.juggernaut)state.player.statuses.strength=(state.player.statuses.strength||0)+state.player.statuses.juggernaut;
+  if(state.player.statuses.coreenergy)b.energy+=state.player.statuses.coreenergy;
+  if(state.player.statuses.fury)state.player.block+=state.player.statuses.fury;
+  if(state.player.statuses.deathmark)enemyStatusAllProxy(b);
+  if(state.player.statuses.shadowstep)state.player.statuses.dexterity=(state.player.statuses.dexterity||0)+state.player.statuses.shadowstep;
+  if(state.player.statuses.rage){ state.player.statuses.strength=(state.player.statuses.strength||0)+1; state.player.hp=Math.max(0,state.player.hp-(state.player.statuses.rage||0)); if(state.player.hp<=0)return gameOver(); }
+  // 抽牌
+  drawCards(5 + (b.drawBonus||0));
+  b.drawBonus=0;
+  b.busy=false;
+  // 更新敌人意图
+  b.enemies.forEach(e=>{if(e.hp>0)e.intent=ENEMIES[e.def].ai(e,++e.aiTurn);});
+  // 目标
+  if(!b.enemies[b.target]||b.enemies[b.target].hp<=0)b.target=firstAlive();
+  render();
+}
+function enemyStatusAllProxy(b){ b.enemies.forEach(e=>{if(e.hp>0)e.statuses.poison=(e.statuses.poison||0)+state.player.statuses.deathmark;}); }
+function drawCards(n){
+  const b=state.battle;
+  for(let i=0;i<n;i++){
+    if(b.hand.length>=10)break;
+    if(b.drawPile.length===0){
+      if(b.discard.length===0)break;
+      b.drawPile=shuffle(b.discard); b.discard=[]; SFX.shuffle(); log('弃牌堆洗回抽牌堆');
+    }
+    b.hand.push(b.drawPile.pop());
+  }
+}
+function firstAlive(){const i=state.battle.enemies.findIndex(e=>e.hp>0);return i<0?0:i;}
+function tgtEnemy(){ const b=state.battle; let i=b.target; if(!b.enemies[i]||b.enemies[i].hp<=0)i=firstAlive(); return b.enemies[i]; }
+function selectTarget(i){ if(state.battle.enemies[i]&&state.battle.enemies[i].hp>0){state.battle.target=i;SFX.select();render();} }
+
+// 伤害计算
+function calcAttack(source,target,base,doubleStr){
+  let d=base+(source.statuses.strength||0)*(doubleStr?2:1);
+  if(source.statuses.weak)d=Math.floor(d*0.75);
+  if(source===state.player && state.player.relics.some(r=>RELICS[r].dmgBonus))
+    d+=state.player.relics.reduce((s,r)=>s+(RELICS[r].dmgBonus||0),0);
+  return Math.max(0,d);
+}
+function applyDamage(target,amount,isAttack,source){
+  if(isAttack && target.statuses.vulnerable)amount=Math.floor(amount*1.5);
+  let blocked=Math.min(target.block,amount); target.block-=blocked;
+  let rem=amount-blocked;
+  if(rem>0){
+    target.hp-=rem;
+    if(target===state.player && isAttack && source){
+      // 反伤遗物
+      const tf=state.player.relics.reduce((s,r)=>s+(RELICS[r].thorn||0),0);
+      if(tf>0)applyDamage(source,tf,false,null);
+    }
+  }
+  if(target.hp<0)target.hp=0;
+}
+function dealToEnemy(enemy,base,doubleStr,pierce){
+  const b=state.battle;
+  if(!enemy||enemy.hp<=0)enemy=b.enemies[firstAlive()];
+  if(!enemy||enemy.hp<=0)return;
+  const amt=calcAttack(state.player,enemy,base,doubleStr);
+  const before=enemy.hp;
+  if(pierce){ enemy.block=0; applyDamage(enemy,amt,true,state.player); }
+  else { applyDamage(enemy,amt,true,state.player); }
+  const real=before-enemy.hp;
+  if(real>0){
+    const idx=enemy.idx;
+    if(amt>=10)SFX.bigHit(); else SFX.hit();
+    floatText('#enemySprite'+idx,'-'+real,'#ff7186');
+    flashEl('#enemySprite'+idx);
+  }
+  log(`对 ${enemy.name} 造成 ${real} 伤害`);
+}
+function makeCtx(){
+  const b=state.battle;
+  return {
+    attack:(dmg,ds)=>dealToEnemy(tgtEnemy(),dmg,ds,false),
+    attackPierce:(dmg)=>dealToEnemy(tgtEnemy(),dmg,false,true),
+    attackAll:(dmg)=>b.enemies.filter(e=>e.hp>0).forEach(e=>{const before=e.hp;const a=calcAttack(state.player,e,dmg,false);applyDamage(e,a,true,state.player);const real=before-e.hp;if(real>0){floatText('#enemySprite'+e.idx,'-'+real,'#ff7186');}}),
+    block:(n)=>{const d=n+(state.player.statuses.dexterity||0);state.player.block+=d;SFX.block();floatText('#playerSprite','🛡'+d,'#6fb7e0');},
+    enemyStatus:(name,n)=>{const e=tgtEnemy();if(e&&e.hp>0)e.statuses[name]=(e.statuses[name]||0)+n;},
+    enemyStatusAll:(name,n)=>b.enemies.forEach(e=>{if(e.hp>0)e.statuses[name]=(e.statuses[name]||0)+n;}),
+    playerStatus:(name,n)=>{state.player.statuses[name]=(state.player.statuses[name]||0)+n;},
+    draw:(n)=>drawCards(n),
+    energy:(n)=>{b.energy+=n;},
+    damageSelf:(n)=>{state.player.hp=Math.max(0,state.player.hp-n);},
+    calcAttack:(base)=>calcAttack(state.player,tgtEnemy(),base,false),
+    rawDeal:(e,a)=>applyDamage(e,a,true,state.player),
+  };
+}
+/* ===================== 拖拽出牌 + 攻击飞行动画 ===================== */
+let drag=null, cardAnimating=false;
+function cardDown(e, idx){
+  if(!state||state.screen!=='battle')return;
+  const b=state.battle; if(!b||b.busy||cardAnimating)return;
+  const card=e.currentTarget; if(!b.hand[idx])return;
+  e.preventDefault();
+  drag={idx,card,def:CARDS[b.hand[idx].id],x0:e.clientX,y0:e.clientY,moved:false};
+  card.style.pointerEvents='none';
+  window.addEventListener('pointermove',cardMove);
+  window.addEventListener('pointerup',cardUp);
+  window.addEventListener('pointercancel',cardUp);
+}
+function cardMove(e){
+  if(!drag)return;
+  const dx=e.clientX-drag.x0, dy=e.clientY-drag.y0;
+  if(!drag.moved){
+    if(Math.hypot(dx,dy)<8)return;
+    drag.moved=true;
+    drag.card.classList.add('dragging');
+    const r=drag.card.getBoundingClientRect();
+    drag.w=r.width; drag.h=r.height;
+    drag.card.style.position='fixed'; drag.card.style.margin='0';
+    drag.card.style.left=r.left+'px'; drag.card.style.top=r.top+'px';
+    drag.card.style.width=r.width+'px'; drag.card.style.height=r.height+'px';
+    drag.card.style.zIndex='85';
+  }
+  drag.card.style.left=(e.clientX-drag.w/2)+'px';
+  drag.card.style.top=(e.clientY-drag.h/2)+'px';
+  updateArrow(e);
+}
+function cardUp(e){
+  window.removeEventListener('pointermove',cardMove);
+  window.removeEventListener('pointerup',cardUp);
+  window.removeEventListener('pointercancel',cardUp);
+  if(!drag)return;
+  const d=drag; drag=null;
+  clearArrow();
+  document.querySelectorAll('.enemy.aim').forEach(x=>x.classList.remove('aim'));
+  const b=state.battle; if(!b)return;
+  if(!d.moved){ playCardAnimated(d.idx,null); return; }
+  const def=d.def, playable=b.energy>=def.cost;
+  if(def.type==='attack'){
+    if(playable){
+      const en=enemyUnder(e.clientX,e.clientY);
+      if(en){ const idx=+en.dataset.idx; if(b.enemies[idx]&&b.enemies[idx].hp>0){ b.target=idx; playCardAnimated(d.idx,idx); return; } }
+    }
+    render(); return;
+  } else {
+    if(playable){
+      const hz=document.querySelector('.handzone'); const top=hz?hz.getBoundingClientRect().top:window.innerHeight-200;
+      if(e.clientY<top-6){ playCardAnimated(d.idx,null); return; }
+    }
+    render(); return;
+  }
+}
+function enemyUnder(x,y){ const el=document.elementFromPoint(x,y); return el?el.closest('.enemy'):null; }
+function highlightAim(en){
+  document.querySelectorAll('.enemy.aim').forEach(x=>x.classList.remove('aim'));
+  if(en){ const idx=+en.dataset.idx; if(state.battle.enemies[idx]&&state.battle.enemies[idx].hp>0)en.classList.add('aim'); }
+}
+function updateArrow(e){
+  const d=drag; if(!d)return; clearArrow();
+  const r=d.card.getBoundingClientRect();
+  if(d.def.type==='attack'){
+    const x1=r.left+r.width/2, y1=r.bottom;
+    const en=enemyUnder(e.clientX,e.clientY);
+    let ex=e.clientX, ey=e.clientY, color='#ff7186';
+    if(en){ const idx=+en.dataset.idx; if(state.battle.enemies[idx]&&state.battle.enemies[idx].hp>0){
+      const sp=en.querySelector('.sprite').getBoundingClientRect();
+      ex=sp.left+sp.width/2; ey=sp.top+sp.height/2; color='#ffd166';
+    }}
+    highlightAim(en);
+    drawArrow(x1,y1,ex,ey,color);
+  } else {
+    drawArrow(r.left+r.width/2,r.top+r.height/2,e.clientX,e.clientY,'#e8c468');
+  }
+}
+function drawArrow(x1,y1,x2,y2,color){
+  const svg=document.getElementById('arrowLayer'); if(!svg)return;
+  const cx=(x1+x2)/2-(y2-y1)*0.18, cy=(y1+y2)/2+(x2-x1)*0.18;
+  const ang=Math.atan2(y2-cy,x2-cx), ah=15;
+  const a1=ang+Math.PI*0.82, a2=ang-Math.PI*0.82;
+  const p1x=x2+ah*Math.cos(a1), p1y=y2+ah*Math.sin(a1);
+  const p2x=x2+ah*Math.cos(a2), p2y=y2+ah*Math.sin(a2);
+  svg.innerHTML=`<path d="M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}" stroke="${color}" stroke-width="5" fill="none" stroke-linecap="round" opacity="0.92"/>`+
+    `<polygon points="${x2},${y2} ${p1x},${p1y} ${p2x},${p2y}" fill="${color}"/>`;
+}
+function clearArrow(){ const svg=document.getElementById('arrowLayer'); if(svg)svg.innerHTML=''; }
+function flyCardTo(srcEl,dstEl){
+  return new Promise(res=>{
+    const s=srcEl.getBoundingClientRect(), d=dstEl.getBoundingClientRect();
+    const clone=srcEl.cloneNode(true); clone.classList.remove('dragging');
+    clone.style.cssText='position:fixed;margin:0;left:'+s.left+'px;top:'+s.top+'px;width:'+s.width+'px;height:'+s.height+'px;z-index:86;pointer-events:none;transition:none';
+    document.body.appendChild(clone); srcEl.style.visibility='hidden';
+    const dx=(d.left+d.width/2)-(s.left+s.width/2), dy=(d.top+d.height/2)-(s.top+s.height/2);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{ clone.style.transition='transform .17s cubic-bezier(.3,1.3,.5,1)'; clone.style.transform='translate('+dx+'px,'+dy+'px) scale(.32) rotate(9deg)'; }));
+    setTimeout(()=>{ clone.remove(); res(); },185);
+  });
+}
+function liftFade(srcEl){
+  return new Promise(res=>{
+    const s=srcEl.getBoundingClientRect();
+    const clone=srcEl.cloneNode(true); clone.classList.remove('dragging');
+    clone.style.cssText='position:fixed;margin:0;left:'+s.left+'px;top:'+s.top+'px;width:'+s.width+'px;height:'+s.height+'px;z-index:86;pointer-events:none;transition:none;opacity:1';
+    document.body.appendChild(clone); srcEl.style.visibility='hidden';
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{ clone.style.transition='transform .2s ease, opacity .2s ease'; clone.style.transform='translateY(-72px) scale(.92)'; clone.style.opacity='0'; }));
+    setTimeout(()=>{ clone.remove(); res(); },210);
+  });
+}
+async function playCardAnimated(idx,targetOverride){
+  const b=state.battle; if(!b||cardAnimating)return;
+  const inst=b.hand[idx]; if(!inst)return;
+  const def=CARDS[inst.id];
+  if(b.energy<def.cost){toast('能量不足');return;}
+  if(def.type==='attack'){
+    let tgt=targetOverride!=null?targetOverride:b.target;
+    if(!b.enemies[tgt]||b.enemies[tgt].hp<=0)tgt=firstAlive();
+    if(!b.enemies[tgt]||b.enemies[tgt].hp<=0)return;
+    b.target=tgt;
+    const cardEl=document.querySelector('.card[data-idx="'+idx+'"]');
+    const enemyEl=document.getElementById('enemySprite'+tgt);
+    if(cardEl&&enemyEl){ cardAnimating=true; await flyCardTo(cardEl,enemyEl); cardAnimating=false; }
+    resolvePlay(idx);
+  } else {
+    const cardEl=document.querySelector('.card[data-idx="'+idx+'"]');
+    if(cardEl){ cardAnimating=true; await liftFade(cardEl); cardAnimating=false; }
+    resolvePlay(idx);
+  }
+}
+function resolvePlay(idx){
+  const b=state.battle; if(!b)return;
+  const inst=b.hand[idx]; if(!inst)return;
+  const def=CARDS[inst.id];
+  const stats=inst.upgraded?{...def.base,...def.up}:{...def.base};
+  if(b.energy<def.cost){toast('能量不足');render();return;}
+  if(def.type==='attack' && (!b.enemies[b.target]||b.enemies[b.target].hp<=0))b.target=firstAlive();
+  b.energy-=def.cost;
+  SFX.card();
+  def.play(stats,makeCtx());
+  b.hand.splice(idx,1);
+  if(def.type==='power')b.exhaust.push(inst); else b.discard.push(inst);
+  checkDeaths();
+  if(state.player.hp<=0)return gameOver();
+  render();
+}
+function playCard(i){ playCardAnimated(i,null); }
+function checkDeaths(){
+  const b=state.battle; if(!b||b.kind==='done')return;
+  if(b.enemies.every(e=>e.hp<=0))battleWin();
+}
+/* 回合结束：剩余手牌全部弃置（保留 retain 卡） */
+async function discardHand(){
+  const b=state.battle;
+  if(!b.hand.length)return;
+  const dump=[],keep=[];
+  b.hand.forEach(inst=>{ (CARDS[inst.id].retain?keep:dump).push(inst); });
+  if(!dump.length){ b.hand=keep; return; }
+  SFX.discard();
+  const dumpIdx=new Set();
+  b.hand.forEach((inst,i)=>{ if(!CARDS[inst.id].retain)dumpIdx.add(i); });
+  let cards=[];
+  try{
+    cards=[...document.querySelectorAll('#handzone .card')].filter(el=>dumpIdx.has(parseInt(el.dataset.idx,10)));
+  }catch(e){ cards=[]; }
+  const pile=document.getElementById('discardPile');
+  if(pile && cards.length){
+    const pr=pile.getBoundingClientRect();
+    cards.forEach((el,i)=>{
+      const r=el.getBoundingClientRect();
+      const dx=(pr.left+pr.width/2)-(r.left+r.width/2);
+      const dy=(pr.top+pr.height/2)-(r.top+r.height/2);
+      el.style.zIndex=40+i;
+      setTimeout(()=>{
+        el.style.transition='transform .34s cubic-bezier(.45,.05,.7,1), opacity .34s ease-in';
+        el.style.transform=`translate(${dx}px,${dy}px) scale(.26) rotate(16deg)`;
+        el.style.opacity='0';
+      }, i*42);
+    });
+    await sleep(320+Math.min(cards.length-1,6)*42);
+  }
+  dump.forEach(c=>b.discard.push(c));
+  b.hand=keep;
+  log(`回合结束，弃置 ${dump.length} 张手牌`);
+  render();
+}
+async function endTurn(){
+  const b=state.battle; if(b.busy)return;
+  b.busy=true;
+  await discardHand();
+  decStatus(state.player);
+  render();
+  await sleep(250);
+  for(const e of state.battle.enemies){
+    if(e.hp<=0)continue;
+    e.block=0;
+    if(e.statuses.poison){ e.hp-=e.statuses.poison; e.statuses.poison--; if(e.hp<=0){log(`${e.name} 中毒身亡`);render();await sleep(350);continue;} }
+    await sleep(300);
+    executeIntent(e);
+    decStatus(e);
+    checkDeaths();
+    render();
+    await sleep(350);
+    if(state.player.hp<=0){return gameOver();}
+  }
+  checkDeaths();
+  if(state.battle.kind==='done')return;
+  startPlayerTurn(false);
+}
+function executeIntent(e){
+  const it=e.intent;
+  const B=state.player;
+  let val=it.val;
+  if(it.type==='attack'||it.type==='attack_def'||it.type==='attack_debuff'||it.type==='multi'){
+    if(state.player.relics.some(r=>RELICS[r].defDown)){
+      if(it.type==='multi')val=Math.max(0,it.val-(RELICS[state.player.relics.find(r=>RELICS[r].defDown)].defDown));
+      else val=Math.max(0,it.val-(RELICS[state.player.relics.find(r=>RELICS[r].defDown)].defDown));
+    }
+  }
+  if(it.type==='attack'){ const a=calcAttack(e,B,val,false);applyDamage(B,a,true,e);onPlayerHit(a);}
+  else if(it.type==='defend'){ e.block+=it.val; }
+  else if(it.type==='buff'){ e.statuses.strength=(e.statuses.strength||0)+it.val; log(`${e.name} 力量 +${it.val}`);SFX.buff();}
+  else if(it.type==='debuff'){ B.statuses[it.status]=(B.statuses[it.status]||0)+it.val; SFX.debuff(); }
+  else if(it.type==='attack_def'){ const a=calcAttack(e,B,val,false);applyDamage(B,a,true,e);e.block+=it.val2||0;onPlayerHit(a);}
+  else if(it.type==='attack_debuff'){ const a=calcAttack(e,B,val,false);applyDamage(B,a,true,e);B.statuses[it.status]=(B.statuses[it.status]||0)+it.st;SFX.debuff();onPlayerHit(a);}
+  else if(it.type==='multi'){ for(let i=0;i<it.times;i++){const a=calcAttack(e,B,val,false);applyDamage(B,a,true,e);}onPlayerHit(val*it.times);}
+}
+function onPlayerHit(a){
+  if(a>0){ SFX.hit(); shakeScreen(); floatText('#playerSprite','-'+a,'#ff7186'); flashEl('#playerSprite'); }
+}
+function decStatus(u){
+  ['vulnerable','weak'].forEach(s=>{ if(u.statuses[s]){u.statuses[s]--; if(u.statuses[s]<=0)delete u.statuses[s];} });
+}
+function battleWin(){
+  const b=state.battle; const kind=b.kind; b.kind='done'; b.busy=false;
+  state.player.relics.forEach(r=>{const R=RELICS[r];if(R.onBattleEnd)R.onBattleEnd(state.player);});
+  log('战斗胜利！');
+  const isBoss=kind==='boss', isElite=kind==='elite';
+  const s=depthScale((state.map&&state.map.current)?state.map.current.floor:0);
+  let gold=0, cards=[], relic=null;
+  if(isBoss){ gold=Math.round((rng(40)+60)*s); relic=grantRandomRelic(false); }
+  else if(isElite){ gold=Math.round((rng(20)+35)*s); relic=grantRandomRelic(false); }
+  else gold=Math.round((rng(12)+15)*s);
+  const rarity = (isElite||isBoss)?pick(['uncommon','uncommon','rare']):pick(['common','common','uncommon']);
+  const pool=classPool(state.player.cls,rarity);
+  cards=shuffle(pool).slice(0,3);
+  state.reward={gold,cards,relic,taken:false};
+  state.player.gold+=gold;
+  SFX.win();
+  state.screen='reward';
+  render();
+}
+function grantRandomRelic(silent){
+  const avail=Object.keys(RELICS).filter(r=>!state.player.relics.includes(r));
+  if(avail.length===0)return null;
+  const id=pick(avail);
+  if(!silent)state.player.relics.push(id);
+  return id;
+}
+function chooseReward(cardId){
+  if(cardId)addCardToDeck(cardId,false);
+  state.reward=null;
+  afterNode();
+}
+function addCardToDeck(id,up){state.player.deck.push({id,upgraded:!!up});}
+
+/* ===================== 节点处理 ===================== */
+function selectNode(floor,idx){
+  unlockAudio();
+  const m=state.map;
+  if(floor===0 && m.current===null){
+    m.current={floor,idx}; m.floors[0][idx].visited=true; saveGame(); enterNode(floor,idx); return;
+  }
+  if(m.current && floor===m.current.floor+1 && m.floors[m.current.floor][m.current.idx].next.includes(idx)){
+    m.current={floor,idx}; m.floors[floor][idx].visited=true; saveGame(); enterNode(floor,idx); return;
+  }
+}
+function enterNode(floor,idx){
+  const node=state.map.floors[floor][idx];
+  if(node.type==='battle'){
+    const n=rng(2)+1; const ids=[]; for(let i=0;i<n;i++)ids.push(pick(NORMAL_POOL));
+    startBattle('battle',ids);
+  } else if(node.type==='elite'){
+    startBattle('elite',[pick(ELITE_POOL)]);
+  } else if(node.type==='boss'){
+    startBattle('boss',[pick(BOSS_POOL)]);
+  } else if(node.type==='event'){
+    state.event={def:EVENTS[node.eventIndex]}; state.screen='event'; render();
+  } else if(node.type==='shop'){
+    state.shop=node.shop; state.screen='shop'; render();
+  } else if(node.type==='rest'){
+    state.screen='rest'; render();
+  }
+}
+function afterNode(){
+  if(state.map.current && state.map.current.floor===state.map.N-1){ return victory(); }
+  state.screen='map'; saveGame(); render();
+}
+function eventChoice(i){
+  const opt=state.event.def.options[i];
+  const before=state.screen;
+  if(opt.act)opt.act();
+  state.event=null;
+  if(state.screen!==before){ render(); return; }
+  afterNode();
+}
+
+/* ===================== 商店 ===================== */
+function buyCard(i){
+  const s=state.shop; const item=s.cards[i]; if(!item)return;
+  if(state.player.gold<item.cost){toast('金币不足');return;}
+  state.cardget={id:item.id,back:'shop',shopIndex:i}; state.screen='cardget'; render();
+}
+function showCardGet(id,back){ state.cardget={id,back:back||null}; state.screen='cardget'; render(); }
+function cardGetConfirm(){
+  const g=state.cardget; if(!g){ afterNode(); return; }
+  if(g.back==='shop'){
+    const s=state.shop; const item=s.cards[g.shopIndex];
+    if(item && state.player.gold>=item.cost){ state.player.gold-=item.cost; addCardToDeck(item.id,item.upgraded); s.cards.splice(g.shopIndex,1); SFX.coin(); }
+    state.cardget=null; state.screen='shop'; render();
+  } else {
+    addCardToDeck(g.id,false); state.cardget=null; afterNode();
+  }
+}
+function cardgetHTML(){
+  const g=state.cardget; if(!g)return '<div class="overlay"></div>';
+  const def=CARDS[g.id]; const card=cardFaceHTML({id:g.id,upgraded:false},'');
+  const isShop=g.back==='shop';
+  return `${topbarHTML()}<div class="overlay"><div class="panel">
+    <h2>${isShop?'🛒 购入卡牌':'🎁 获得新卡'}</h2>
+    <div class="desc">${isShop?'你花费金币购入了一张卡牌，收下它加入卡组：':'你的选择让你获得了一张卡牌，收下它加入卡组：'}</div>
+    <div class="row" style="justify-content:center">${card}</div>
+    <div class="center"><button class="btn primary" onclick="cardGetConfirm()">收下 ▸</button></div>
+  </div></div>`;
+}
+function buyRelic(i){
+  const s=state.shop; const item=s.relics[i]; if(!item)return;
+  if(state.player.gold<item.cost){toast('金币不足');return;}
+  state.player.gold-=item.cost; state.player.relics.push(item.id);
+  s.relics.splice(i,1); SFX.coin(); render();
+}
+function shopRemove(i){
+  const s=state.shop;
+  if(state.player.gold<s.removeCost){toast('金币不足');return;}
+  state.player.gold-=s.removeCost; state.removePick=null; state.screen='remove'; state.removeReturn='shop'; render();
+}
+
+/* ===================== 删除/升级卡 ===================== */
+function restHeal(){ state.player.hp=clamp(state.player.hp+Math.floor(state.player.maxHp*0.3),0,state.player.maxHp); afterNode(); }
+function pickUpgrade(i){ state.upgradePick=i; SFX.click(); render(); }
+function cancelUpgradePick(){ state.upgradePick=null; SFX.click(); render(); }
+function confirmUpgrade(){
+  const i=state.upgradePick; if(i==null||i<0||i>=state.player.deck.length)return;
+  const c=state.player.deck[i]; if(c.upgraded)return;
+  const def=CARDS[c.id];
+  c.upgraded=true;
+  state.upgradePick=null;
+  toast('已升级「'+def.name+' ★」');
+  afterNode();
+}
+
+/* ===================== 结束 ===================== */
+function gameOver(){ state.screen='gameover'; SFX.lose(); bumpStats(s=>{s.bestFloor=Math.max(s.bestFloor,state.map.current?state.map.current.floor:0);}); saveGame(); render(); }
+function victory(){ state.screen='victory'; SFX.win(); bumpStats(s=>{s.wins++;s.bestFloor=Math.max(s.bestFloor,state.map.N-1);}); saveGame(); render(); }
+
+/* ===================== 存档 / 战绩 ===================== */
+const SAVE_KEY='spire_echoes_save_v2';
+const STATS_KEY='spire_echoes_stats_v2';
+function saveGame(){
+  try{
+    if(!state||!state.map)return;
+    const safe=['map','event','shop','rest','reward','remove','upgrade'];
+    if(!safe.includes(state.screen))return;
+    const data={
+      cls:state.player.cls,
+      player:{cls:state.player.cls,hp:state.player.hp,maxHp:state.player.maxHp,deck:state.player.deck,gold:state.player.gold,relics:state.player.relics},
+      map:state.map,
+    };
+    localStorage.setItem(SAVE_KEY,JSON.stringify(data));
+  }catch(e){}
+}
+function loadGame(){
+  try{
+    const s=localStorage.getItem(SAVE_KEY); if(!s)return false;
+    const d=JSON.parse(s);
+    state={screen:'map',cls:d.player.cls,
+      player:{cls:d.player.cls,hp:d.player.hp,maxHp:d.player.maxHp,block:0,energy:3,maxEnergy:3,gold:d.player.gold,
+        deck:d.player.deck,relics:d.player.relics,statuses:{}},
+      map:d.map,battle:null,reward:null,shop:null,event:null,removeReturn:null,selectedTarget:0,pileView:null,log:[]};
+    return true;
+  }catch(e){return false;}
+}
+function hasSave(){ try{return !!localStorage.getItem(SAVE_KEY);}catch(e){return false;} }
+function loadStats(){ try{return JSON.parse(localStorage.getItem(STATS_KEY))||{runs:0,wins:0,bestFloor:0};}catch(e){return {runs:0,wins:0,bestFloor:0};} }
+function bumpStats(fn){ try{const s=loadStats();fn(s);localStorage.setItem(STATS_KEY,JSON.stringify(s));}catch(e){} }
+
+/* ===================== 日志/提示 ===================== */
+function log(t){ state.log.unshift(t); if(state.log.length>30)state.log.pop(); }
+function toast(t){
+  const d=document.createElement('div'); d.className='toast'; d.textContent=t;
+  document.body.appendChild(d); setTimeout(()=>d.remove(),1800);
+}
+
+/* ===================== 状态图标 ===================== */
+const STATUS_INFO={
+  strength:{icon:'💪',name:'力量',good:true,desc:'每层使你的攻击伤害 +1（攻击牌每张额外 +层数；双重打击等翻倍类按倍数计算）。'},
+  vulnerable:{icon:'🔻',name:'易伤',good:false,desc:'受到的攻击伤害 +50%。每回合末减少 1 层。'},
+  weak:{icon:'🌫️',name:'虚弱',good:false,desc:'造成的攻击伤害 -25%。每回合末减少 1 层。'},
+  poison:{icon:'☠️',name:'中毒',good:false,desc:'回合开始时受到等同层数的伤害，之后层数 -1。对敌人或自身均生效。'},
+  demonform:{icon:'👹',name:'恶魔形态',good:true,desc:'每回合开始获得 1 层力量（持续整场战斗）。'},
+  coreenergy:{icon:'⚙️',name:'核心能量',good:true,desc:'每回合开始额外获得等同层数的能量。'},
+  fury:{icon:'🔥',name:'不屈',good:true,desc:'每回合开始获得等同层数的护甲。'},
+  dexterity:{icon:'🤸',name:'敏捷',good:true,desc:'每层使你获得的护甲 +1。'},
+  juggernaut:{icon:'🛡️',name:'钢铁意志',good:true,desc:'能力：整场战斗永久获得 2 点力量。'},
+  deathmark:{icon:'💀',name:'死亡印记',good:true,desc:'每回合开始对所有敌人施加等同层数的中毒。'},
+  shadowstep:{icon:'🌑',name:'影步',good:true,desc:'每回合开始获得等同层数的敏捷。'},
+  rage:{icon:'🤯',name:'暴怒',good:false,desc:'每打出一张牌失去 1 点生命，并在回合开始获得 1 层力量（层数越高代价越大）。'},
+};
+function statusHTML(u){
+  let h='';
+  for(const k in u.statuses){
+    if(!u.statuses[k])continue;
+    const info=STATUS_INFO[k];
+    if(!info){ h+=`<span class="st" data-tip="${k}">●<b>${u.statuses[k]}</b></span>`; continue; }
+    const cls='st '+(info.good?'buff':'debuff');
+    h+=`<span class="${cls}" data-tip="<b>${info.name}</b>：${info.desc}">${info.icon}<b>${u.statuses[k]}</b></span>`;
+  }
+  return h;
+}
+
+/* ===================== 牌堆 / 卡组浏览 ===================== */
+function cardFaceHTML(inst,extraClass){
+  const def=CARDS[inst.id];
+  const stats=inst.upgraded?{...def.base,...def.up}:{...def.base};
+  return `<div class="card ${def.type} ${extraClass||''}">
+    <div class="cost">${def.cost}</div>
+    ${inst.upgraded?'<div class="up">★</div>':''}
+    <div class="topbar-c"></div>
+    <div class="cname">${def.name}</div>
+    <div class="cart">${def.art}</div>
+    <div class="cdesc">${def.desc(stats)}</div>
+    <div class="ctype">${def.type==='attack'?'攻击':def.type==='skill'?'技能':'能力'}${inst.upgraded?' · 已升级':''}</div>
+  </div>`;
+}
+function sortForView(a,b){
+  const ca=CARDS[a.id], cb=CARDS[b.id];
+  if(ca.cost!==cb.cost)return ca.cost-cb.cost;
+  const oa={attack:0,skill:1,power:2}[ca.type], ob={attack:0,skill:1,power:2}[cb.type];
+  if(oa!==ob)return oa-ob;
+  return ca.name.localeCompare(cb.name,'zh');
+}
+function openPile(kind){
+  unlockAudio(); SFX.click();
+  if(kind==='deck'){
+    const cards=state.player.deck.slice().sort(sortForView);
+    state.pileView={kind,title:'🃏 我的卡组',note:`共 ${cards.length} 张 · 按费用排序`,cards};
+    render(); return;
+  }
+  const b=state.battle; if(!b){toast('当前不在战斗中');return;}
+  if(kind==='draw'){
+    const cards=b.drawPile.slice().sort(sortForView);
+    state.pileView={kind,title:'🂠 抽牌堆',note:`共 ${cards.length} 张 · 顺序已隐藏（不剧透抽牌顺序）`,cards};
+  } else if(kind==='discard'){
+    const cards=b.discard.slice().reverse();
+    state.pileView={kind,title:'🗑️ 弃牌堆',note:`共 ${cards.length} 张 · 最新弃置的在前`,cards};
+  } else if(kind==='exhaust'){
+    const cards=b.exhaust.slice().reverse();
+    state.pileView={kind,title:'🔥 消耗堆',note:`共 ${cards.length} 张 · 本场战斗内不再回到牌库`,cards};
+  } else return;
+  render();
+}
+function closePile(){ state.pileView=null; SFX.click(); render(); }
+function pileHTML(){
+  const v=state.pileView; if(!v)return'';
+  const cards=v.cards.length?v.cards.map(c=>cardFaceHTML(c,'small')).join('')
+    :'<div class="mempty">这里空空如也。</div>';
+  return `<div class="modal" onclick="if(event.target===this)closePile()">
+    <div class="mpanel">
+      <div class="mhead">
+        <h2>${v.title}</h2>
+        <span class="note">${v.note}</span>
+        <div class="spacer" style="flex:1"></div>
+        <button class="btn primary" onclick="closePile()">关闭 ✕</button>
+      </div>
+      <div class="mgrid">${cards}</div>
+    </div>
+  </div>`;
+}
+
+function openCodex(){ state.codex=true; render(); }
+function closeCodex(){ state.codex=false; render(); }
+function codexHTML(){
+  const all=Object.keys(CARDS);
+  const groups=[
+    {t:'🦸 铁甲战士 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='warrior'&&CARDS[id].rarity==='starter')},
+    {t:'🏹 暗影游侠 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='hunter'&&CARDS[id].rarity==='starter')},
+    {t:'🃏 中立卡组（两职业通用）', ids:all.filter(id=>CARDS[id].cls==='neutral')},
+    {t:'🦸 铁甲战士 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='warrior'&&CARDS[id].rarity!=='starter')},
+    {t:'🏹 暗影游侠 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='hunter'&&CARDS[id].rarity!=='starter')},
+  ];
+  const body=groups.map(g=>{ if(!g.ids.length)return''; const cards=g.ids.map(id=>cardFaceHTML({id,upgraded:false},'small')).join(''); return `<div class="cgroup"><h3>${g.t} · ${g.ids.length} 张</h3><div class="mgrid">${cards}</div></div>`; }).join('');
+  return `<div class="modal" onclick="if(event.target===this)closeCodex()"><div class="mpanel">
+    <div class="mhead"><h2>📖 卡组图鉴</h2><span class="note">基础卡组 / 中立卡组 / 角色专有可获得卡 · 共 ${all.length} 种</span><div class="spacer" style="flex:1"></div><button class="btn primary" onclick="closeCodex()">关闭 ✕</button></div>
+    <div class="codex-scroll">${body}</div></div></div>`;
+}
+
+/* ===================== 渲染 ===================== */
+function render(){
+  const app=$('#app');
+  let html='';
+  if(state.screen==='title'){html=titleHTML(); if(state.codex)html+=codexHTML();}
+  else if(state.screen==='map')html=mapHTML();
+  else if(state.screen==='battle')html=battleHTML();
+  else if(state.screen==='reward')html=rewardHTML();
+  else if(state.screen==='shop')html=shopHTML();
+  else if(state.screen==='rest')html=restHTML();
+  else if(state.screen==='event')html=eventHTML();
+  else if(state.screen==='upgrade')html=upgradeHTML();
+  else if(state.screen==='remove')html=removeHTML();
+  else if(state.screen==='cardget')html=cardgetHTML();
+  else if(state.screen==='gameover')html=endHTML(false);
+  else if(state.screen==='victory')html=endHTML(true);
+  else html='';
+  if(state.pileView && state.pileView.kind!=='deck' && state.screen!=='battle')state.pileView=null;
+  if(state.pileView)html+=pileHTML();
+  app.innerHTML=html;
+  processFx();
+  if(state.screen==='map')requestAnimationFrame(drawMapLines);
+}
+function titleHTML(){
+  const st=loadStats();
+  let cont = hasSave()?`<button class="btn primary" style="font-size:17px;padding:13px 36px" onclick="continueGame()">继续游戏 ▸</button>`:'';
+  return `<div class="title-wrap">
+    <h1>尖塔残响</h1>
+    <p>SLAY THE SPIRE · 卡牌 Roguelike</p>
+    <div class="sub">你是一名攀登尖塔的勇者。抽牌、出牌、构筑卡组，在层层敌人、精英与 Boss 之间杀出一条血路。
+    每场战斗后强化卡组，拾取遗物，直至登顶击碎残响。选择你的职业：</div>
+    <div class="class-row">
+      <div class="class-card warrior" onclick="newGame('warrior')">
+        <div class="cbig">🦸</div><div class="cn">铁甲战士</div>
+        <div class="cb">${CLASSES.warrior.blurb}</div>
+        <div class="chp">❤️ ${CLASSES.warrior.maxHp} 生命 · 起始遗物：燃烧之血</div>
+      </div>
+      <div class="class-card hunter" onclick="newGame('hunter')">
+        <div class="cbig">🏹</div><div class="cn">暗影游侠</div>
+        <div class="cb">${CLASSES.hunter.blurb}</div>
+        <div class="chp">❤️ ${CLASSES.hunter.maxHp} 生命 · 起始遗物：毒药瓶</div>
+      </div>
+    </div>
+    ${cont}
+    <div class="center" style="margin-top:6px"><button class="btn gold" onclick="openCodex()">📖 卡组图鉴</button></div>
+    <div class="stats-line">累计挑战 <b>${st.runs}</b> · 通关 <b>${st.wins}</b> · 最深抵达 <b>第 ${st.bestFloor} 层</b></div>
+    <div class="sub" style="margin-top:6px">操作：<b>拖动卡牌</b>到敌人身上发动攻击（拖动时箭头指向目标）；技能/能力拖到上方区域使用。也可<b>点击敌人</b>切换目标、<b>点击卡牌</b>直接出牌；能量耗尽点「结束回合」。<br>
+    顶部金色<b>遗物栏</b>常驻显示已获遗物（悬停看效果）；顶栏「查看卡组」或战斗中点击<b>抽牌堆 / 弃牌堆 / 消耗堆</b>可查看其中卡牌（Esc 或点击空白处关闭）。<br>
+    <b>核心循环</b>：每回合抽 5 张 → 打出 → <b>回合结束时剩余手牌全部弃入弃牌堆</b>；抽牌堆抽空时弃牌堆洗回，牌库持续循环。</div>
+  </div>`;
+}
+function topbarHTML(){
+  const p=state.player;
+  const hpPct=Math.round(p.hp/p.maxHp*100);
+  const clsBadge = p.cls==='hunter'?'🏹':'🦸';
+  return `<div class="topbar">
+    <div class="stat"><span class="ico">${clsBadge}</span></div>
+    <div class="stat"><span class="ico">❤️</span>
+      <div class="hpbar"><div style="width:${hpPct}%"></div><span>${p.hp}/${p.maxHp}</span></div></div>
+    <div class="stat"><span class="ico">💰</span><b>${p.gold}</b></div>
+    <div class="stat pile" style="flex-direction:row;gap:5px" onclick="openPile('deck')" title="查看卡组">
+      <span class="ico">🃏</span><b>${p.deck.length}</b> 张</div>
+    <div class="spacer"></div>
+    <button class="mutebtn" onclick="toggleMute()" title="音效开关">${muted?'🔇':'🔊'}</button>
+    <button class="btn" style="padding:6px 12px" onclick="openPile('deck')">查看卡组</button>
+  </div>
+  ${relicbarHTML()}`;
+}
+function relicbarHTML(){
+  const p=state.player;
+  let chips='';
+  if(p.relics.length){
+    chips=p.relics.map(r=>{
+      const R=RELICS[r];
+      return `<div class="relicchip"><span class="ri">${R.art}</span><span class="rn">${R.name}</span>
+        <div class="tip"><b>${R.name}</b><br>${R.desc}</div></div>`;
+    }).join('');
+  } else {
+    chips=`<div class="relicchip empty"><span class="rn">暂无遗物 · 击败精英/BOSS 或商店可获得</span></div>`;
+  }
+  return `<div class="relicbar"><span class="rlbl">遗物 ${p.relics.length}</span>${chips}</div>`;
+}
+function mapHTML(){
+  const m=state.map;
+  let floorsHTML='';
+  for(let i=0;i<m.N;i++){
+    const nodes=m.floors[i];
+    let nodesHTML=`<div class="flbl">${i===m.N-1?'BOSS':(i+1)+'F'}</div>`;
+    nodes.forEach((node,idx)=>{
+      const isCur = m.current && m.current.floor===i && m.current.idx===idx;
+      const reachable = (m.current===null && i===0) ||
+        (m.current && i===m.current.floor+1 && m.floors[m.current.floor][m.current.idx].next.includes(idx));
+      const cls=['node'];
+      if(node.visited)cls.push('visited');
+      if(isCur)cls.push('current');
+      if(reachable)cls.push('reachable');
+      if(!reachable && !isCur && !node.visited)cls.push('locked');
+      const icon={battle:'⚔️',elite:'💀',boss:'👑',event:'❓',shop:'🛒',rest:'🔥'}[node.type];
+      const lbl={battle:'战斗',elite:'精英',boss:'BOSS',event:'事件',shop:'商店',rest:'休息'}[node.type];
+      nodesHTML+=`<div class="${cls.join(' ')}" data-f="${i}" data-i="${idx}" ${reachable?`onclick="selectNode(${i},${idx})"`:''}>${icon}<span class="lbl">${lbl}</span></div>`;
+    });
+    floorsHTML+=`<div class="floor">${nodesHTML}</div>`;
+  }
+  return `${topbarHTML()}<div class="map-wrap"><svg class="maplines" id="maplines"></svg>${floorsHTML}</div>
+    <div class="map-hint">从最左端开始，逐层向右点击高亮节点前进 · 共 ${m.N} 层 · 最右端为 BOSS</div>`;
+}
+function drawMapLines(){
+  const wrap=document.querySelector('.map-wrap'); if(!wrap)return;
+  const svg=document.getElementById('maplines'); if(!svg)return;
+  const m=state.map; if(!m)return;
+  const cRect=wrap.getBoundingClientRect();
+  const W=wrap.scrollWidth, H=wrap.scrollHeight;
+  svg.setAttribute('width',W); svg.setAttribute('height',H);
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  svg.innerHTML='';
+  const center=el=>{const r=el.getBoundingClientRect();return {x:r.left-cRect.left+wrap.scrollLeft+r.width/2,y:r.top-cRect.top+wrap.scrollTop+r.height/2};};
+  for(let i=0;i<m.N-1;i++){
+    m.floors[i].forEach((node,fromIdx)=>{
+      const srcEl=wrap.querySelector(`.node[data-f="${i}"][data-i="${fromIdx}"]`);
+      if(!srcEl)return; const s=center(srcEl);
+      node.next.forEach(toIdx=>{
+        const tEl=wrap.querySelector(`.node[data-f="${i+1}"][data-i="${toIdx}"]`);
+        if(!tEl)return; const t=center(tEl);
+        const fromCurrent = m.current && m.current.floor===i && m.current.idx===fromIdx;
+        const onPath = node.visited && m.current && m.current.floor===i+1 && m.current.idx===toIdx;
+        const col = fromCurrent?'#e8c468':(onPath?'#5fcf80':'#3a3f55');
+        const op = fromCurrent?0.95:(onPath?0.7:0.45);
+        const mx=(s.x+t.x)/2;
+        const d=`M ${s.x} ${s.y} C ${mx} ${s.y}, ${mx} ${t.y}, ${t.x} ${t.y}`;
+        const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+        p.setAttribute('d',d); p.setAttribute('fill','none');
+        p.setAttribute('stroke',col); p.setAttribute('stroke-width',fromCurrent?3:2); p.setAttribute('opacity',op);
+        svg.appendChild(p);
+      });
+    });
+  }
+}
+function battleHTML(){
+  const b=state.battle, p=state.player;
+  let enemiesHTML='';
+  b.enemies.forEach((e,i)=>{
+    const hpPct=Math.round(e.hp/e.maxHp*100);
+    const dead=e.hp<=0?'dead':'';
+    const tgt=b.target===i?'targeted':'';
+    const intent=enemyIntentHTML(e);
+    enemiesHTML+=`<div class="enemy ${dead} ${tgt}" data-idx="${i}" onclick="selectTarget(${i})">
+      <div class="intent">${intent}</div>
+      <div class="sprite" id="enemySprite${i}">${e.art}</div>
+      <div class="ename">${e.name}</div>
+      <div class="ebar"><div style="width:${hpPct}%"></div><span>${e.hp}/${e.maxHp}</span></div>
+      ${e.block>0?`<div class="blkbadge">🛡️${e.block}</div>`:''}
+      <div class="statuses">${statusHTML(e)}</div>
+    </div>`;
+  });
+  let handHTML='';
+  b.hand.forEach((inst,i)=>{
+    const def=CARDS[inst.id];
+    const stats=inst.upgraded?{...def.base,...def.up}:{...def.base};
+    const playable=b.energy>=def.cost && !b.busy;
+    handHTML+=`<div class="card ${def.type} ${playable?'':'unplayable'}" data-idx="${i}" onpointerdown="cardDown(event,${i})">
+      <div class="cost">${def.cost}</div>
+      ${inst.upgraded?'<div class="up">★</div>':''}
+      <div class="topbar-c"></div>
+      <div class="cname">${def.name}</div>
+      <div class="cart">${def.art}</div>
+      <div class="cdesc">${def.desc(stats)}</div>
+      <div class="ctype">${def.type==='attack'?'攻击':def.type==='skill'?'技能':'能力'}</div>
+    </div>`;
+  });
+  const pStatsHTML=statusHTML(p);
+  const blockHTML=p.block>0?`<div class="blkbadge" style="font-size:16px">🛡️ ${p.block}</div>`:'';
+  return `${topbarHTML()}
+  <div class="battle">
+    <div class="arena">
+      <div class="player-side">
+        <div class="intent" style="opacity:.0">·</div>
+        <div class="psprite" id="playerSprite">${p.cls==='hunter'?'🏹':'🦸'}</div>
+        <div class="ename">${p.cls==='hunter'?'游侠':'勇者'}</div>
+        ${blockHTML}
+        <div class="pstats">${pStatsHTML}</div>
+      </div>
+      <div class="enemies">${enemiesHTML}</div>
+      <div class="logcenter"><div class="lhead">战 斗 记 录</div><div class="lbody">${state.log.slice(0,6).map((l,i)=>`<div class="logline ${i===0?'fresh':''}">· ${l}</div>`).join('')}</div></div>
+    </div>
+    <div class="handzone" id="handzone">${handHTML}</div>
+    <div class="bottombar">
+      <div class="energy"><div class="n">${b.energy}</div><div class="t">/${p.maxEnergy}</div></div>
+      <div class="pile ${b.drawPile.length?'':'zero'}" id="drawPileIcon" onclick="openPile('draw')" title="点击查看抽牌堆"><span>🂠 抽牌堆</span><b>${b.drawPile.length}</b></div>
+      <div class="pile ${b.discard.length?'':'zero'}" id="discardPile" onclick="openPile('discard')" title="点击查看弃牌堆"><span>🗑️ 弃牌堆</span><b>${b.discard.length}</b></div>
+      <div class="pile ${b.exhaust.length?'':'zero'}" onclick="openPile('exhaust')" title="点击查看消耗堆"><span>🔥 消耗堆</span><b>${b.exhaust.length}</b></div>
+      <div class="spacer"></div>
+      <div style="text-align:right;line-height:1.35">
+        <div style="font-size:11.5px;color:var(--dim)">回合结束时未打出的手牌</div>
+        <div style="font-size:11.5px;color:var(--gold)">将全部弃入弃牌堆（${b.hand.length} 张）</div>
+      </div>
+      <button class="btn primary" ${b.busy?'disabled':''} onclick="endTurn()">结束回合 ▸</button>
+    </div>
+  </div>`;
+}
+function enemyIntentHTML(e){
+  const it=e.intent; if(!it)return'';
+  const B=state.player;
+  let defDown=0;
+  if(state.player.relics.some(r=>RELICS[r].defDown))defDown=RELICS[state.player.relics.find(r=>RELICS[r].defDown)].defDown;
+  if(it.type==='attack'||it.type==='attack_def'||it.type==='attack_debuff'||it.type==='multi'){
+    let base=Math.max(0,it.val-defDown); let val=calcAttack(e,B,base,false);
+    if(it.type==='multi'){const tip=`多重攻击：本回合攻击 ${it.times} 次，每次约 ${val} 点伤害。`;return `<span class="iintent" data-tip="${tip}">⚔️ ${val}×${it.times}</span>`;}
+    const tip=`攻击：本回合将造成约 ${val} 点伤害（已计入你的护甲、易伤与敌方力量）。`;return `<span class="iintent" data-tip="${tip}">⚔️ ${val}</span>`;
+  }
+  if(it.type==='defend'){const tip=`防御：本回合将获得 ${it.val} 点护甲。`;return `<span class="iintent" data-tip="${tip}">🛡️ ${it.val}</span>`;}
+  if(it.type==='buff'){const tip=`强化：本回合将获得 ${it.val} 点力量。`;return `<span class="iintent" data-tip="${tip}">💪 +${it.val}</span>`;}
+  if(it.type==='debuff'){const nm={vulnerable:'易伤',weak:'虚弱',poison:'中毒'}[it.status]||it.status;const st=it.st||1;const tip=`减益：本回合将对你施加 ${st} 层${nm}。`;return `<span class="iintent" data-tip="${tip}">🔻 ${nm}</span>`;}
+  return '?';
+}
+function rewardHTML(){
+  const r=state.reward; if(!r)return '<div class="overlay"></div>';
+  let cardsHTML=r.cards.map(id=>{
+    const def=CARDS[id]; const stats={...def.base};
+    return `<div class="card ${def.type} reward-card" onclick="chooseReward('${id}')">
+      <div class="cost">${def.cost}</div><div class="topbar-c"></div>
+      <div class="cname">${def.name}</div><div class="cart">${def.art}</div>
+      <div class="cdesc">${def.desc(stats)}</div>
+      <div class="ctype">${def.rarity}</div></div>`;
+  }).join('');
+  let relicHTML='';
+  if(r.relic){const R=RELICS[r.relic];relicHTML=`<div class="relic"><span class="ri">${R.art}</span><div><div class="rn">获得遗物：${R.name}</div><div class="rd">${R.desc}</div></div></div>`;}
+  return `${topbarHTML()}<div class="overlay"><div class="panel">
+    <h2>⚔️ 战斗胜利</h2>
+    <div class="desc">获得 <b style="color:var(--gold)">${r.gold}</b> 金币。选择一张卡加入卡组（或跳过）：</div>
+    ${relicHTML?relicHTML+'<div style="height:14px"></div>':''}
+    <div class="row" style="justify-content:center;margin-bottom:18px">${cardsHTML}</div>
+    <div class="center"><button class="btn" onclick="chooseReward(null)">跳过奖励</button></div>
+  </div></div>`;
+}
+function shopHTML(){
+  const s=state.shop, p=state.player;
+  let cards=s.cards.map((it,i)=>{
+    const def=CARDS[it.id]; const stats=it.upgraded?{...def.base,...def.up}:{...def.base};
+    return `<div class="shop-item"><div class="card ${def.type}" style="cursor:default">
+      <div class="cost">${def.cost}</div><div class="topbar-c"></div>
+      <div class="cname">${def.name}</div><div class="cart">${def.art}</div>
+      <div class="cdesc">${def.desc(stats)}</div><div class="ctype">${def.rarity}</div></div>
+      <div class="pr">💰 ${it.cost}</div>
+      <button class="btn gold" ${p.gold<it.cost?'disabled':''} onclick="buyCard(${i})">购买</button></div>`;
+  }).join('');
+  let relics=s.relics.map((it,i)=>{
+    const R=RELICS[it.id];
+    return `<div class="shop-item"><div class="relic" style="width:auto"><span class="ri">${R.art}</span>
+      <div><div class="rn">${R.name}</div><div class="rd">${R.desc}</div></div></div>
+      <div class="pr">💰 ${it.cost}</div>
+      <button class="btn gold" ${p.gold<it.cost?'disabled':''} onclick="buyRelic(${i})">购买</button></div>`;
+  }).join('');
+  return `${topbarHTML()}<div class="overlay"><div class="panel">
+    <h2>🛒 商店</h2>
+    <div class="desc">金币：${p.gold} · 选购卡牌与遗物，或花费 ${s.removeCost} 金移除一张卡。</div>
+    <div class="row" style="margin-bottom:14px">${cards||'<span style="color:var(--dim)">卡牌已售罄</span>'}</div>
+    <div class="row" style="margin-bottom:14px">${relics||''}</div>
+    <div class="center"><button class="btn" onclick="shopRemove()">移除卡牌（💰${s.removeCost}）</button>
+      &nbsp;<button class="btn primary" onclick="afterNode()">离开商店 ▸</button></div>
+  </div></div>`;
+}
+function restHTML(){
+  return `${topbarHTML()}<div class="overlay"><div class="panel">
+    <h2>🔥 休息点</h2>
+    <div class="desc">在篝火旁喘息。选择：回复生命，或将一张卡升级为更强形态（★）。</div>
+    <div class="row" style="justify-content:center">
+      <button class="btn primary" onclick="restHeal()">回复 ${Math.floor(state.player.maxHp*0.3)} 生命</button>
+      <button class="btn gold" onclick="state.screen='upgrade';render()">升级一张卡</button>
+    </div></div></div>`;
+}
+function removeHTML(){
+  const p=state.player;
+  const pick=state.removePick;
+  let cards=p.deck.map((c,i)=>{const def=CARDS[c.id];const stats=c.upgraded?{...def.base,...def.up}:{...def.base};
+    const sel=pick===i?'selected':'';
+    return `<div class="card ${def.type} reward-card ${sel}" onclick="pickRemove(${i})">
+      <div class="cost">${def.cost}</div>${c.upgraded?'<div class="up">★</div>':''}
+      <div class="topbar-c"></div><div class="cname">${def.name}</div><div class="cart">${def.art}</div>
+      <div class="cdesc">${def.desc(stats)}</div><div class="ctype">${def.rarity}</div></div>`;}).join('');
+  let bar='';
+  if(pick!=null && p.deck[pick]){
+    const c=p.deck[pick]; const def=CARDS[c.id]; const lbl=(c.upgraded?def.name+' ★':def.name);
+    bar=`<div class="remove-bar">确认移除「<b>${lbl}</b>」？ <button class="btn primary" onclick="confirmRemove()">确认移除</button> <button class="btn" onclick="cancelRemovePick()">再想想</button></div>`;
+  }
+  return `${topbarHTML()}<div class="overlay"><div class="panel">
+    <h2>🗑️ 移除卡牌</h2><div class="desc">点击一张卡选中，确认后将其从卡组永久移除（当前 ${p.deck.length} 张）。</div>
+    <div class="row" style="justify-content:center">${cards}</div>
+    ${bar}
+    <div class="center" style="margin-top:12px">${pick!=null?'':`<button class="btn" onclick="cancelRemove()">取消</button>`}</div>
+  </div></div>`;
+}
+function pickRemove(i){ state.removePick=i; SFX.click(); render(); }
+function cancelRemovePick(){ state.removePick=null; SFX.click(); render(); }
+function cancelRemove(){ const ret=state.removeReturn; state.removeReturn=null; state.removePick=null; if(ret==='shop'){state.screen='shop';render();} else {afterNode();} }
+function confirmRemove(){
+  const i=state.removePick; if(i==null||i<0||i>=state.player.deck.length)return;
+  const c=state.player.deck[i]; const def=CARDS[c.id]; const lbl=c.upgraded?def.name+' ★':def.name;
+  state.player.deck.splice(i,1);
+  state.removePick=null;
+  toast('已移除「'+lbl+'」');
+  const ret=state.removeReturn; state.removeReturn=null;
+  if(ret==='shop'){state.screen='shop';render();}
+  else {afterNode();}
+}
+function eventHTML(){
+  if(!state.event)return '<div class="overlay"></div>';
+  const ev=state.event.def;
+  let opts=ev.options.map((o,i)=>`<button class="btn evt-opt" onclick="eventChoice(${i})">${(typeof o.label==='function'?o.label():o.label)}<small>${o.sub||''}</small></button>`).join('');
+  return `${topbarHTML()}<div class="overlay"><div class="panel">
+    <h2>${ev.art} ${ev.name}</h2><div class="desc">${ev.desc}</div>
+    <div class="row" style="flex-direction:column">${opts}</div>
+  </div></div>`;
+}
+function endHTML(win){
+  const st=loadStats();
+  return `<div class="title-wrap">
+    <h1 style="background:${win?'linear-gradient(90deg,#5fcf80,#e8c468)':'linear-gradient(90deg,#e0566b,#e08a4f)'};-webkit-background-clip:text;background-clip:text;color:transparent">${win?'登顶成功':'陨落尖塔'}</h1>
+    <div class="sub">${win?'你击碎了尖塔残响，传说由此诞生。':'你的旅程止步于此，但尖塔永远等待着下一位勇者。'}</div>
+    <div class="stat" style="gap:18px;margin:8px 0">
+      <span>❤️ 生命 ${state.player.hp}</span><span>💰 金币 ${state.player.gold}</span>
+      <span>🃏 卡组 ${state.player.deck.length}</span><span>🏆 遗物 ${state.player.relics.length}</span>
+    </div>
+    <div class="stats-line">累计挑战 <b>${st.runs}</b> · 通关 <b>${st.wins}</b> · 最深 <b>第 ${st.bestFloor} 层</b></div>
+    <button class="btn primary" style="font-size:18px;padding:14px 40px" onclick="newGame(state.player.cls||'warrior')">再来一局（${state.player.cls==='hunter'?'暗影游侠':'铁甲战士'}）</button>
+    <button class="btn gold" onclick="location.reload()">返回标题 / 换职业</button>
+  </div>`;
+}
+
+/* ===================== 升级界面（休息点） ===================== */
+function upgradeHTML(){
+  const p=state.player;
+  const pick=state.upgradePick;
+  let cards=p.deck.map((c,i)=>{if(c.upgraded)return'';const def=CARDS[c.id];
+    const stats={...def.base};const us={...def.base,...def.up};
+    const sel=pick===i?'selected':'';
+    return `<div class="card ${def.type} reward-card ${sel}" onclick="pickUpgrade(${i})">
+      <div class="cost">${def.cost}</div><div class="topbar-c"></div><div class="cname">${def.name}</div>
+      <div class="cart">${def.art}</div><div class="cdesc">${def.desc(stats)}</div>
+      <div class="ctype">升级后：${def.desc(us).replace(/<b>|<\/b>/g,'')}</div></div>`;
+  }).join('');
+  let bar='';
+  if(pick!=null && p.deck[pick] && !p.deck[pick].upgraded){
+    const c=p.deck[pick]; const def=CARDS[c.id];
+    bar=`<div class="upgrade-bar">确认将「<b>${def.name}</b>」升级为 ★ 形态？ <button class="btn primary" onclick="confirmUpgrade()">确认升级</button> <button class="btn" onclick="cancelUpgradePick()">再想想</button></div>`;
+  }
+  return `${topbarHTML()}<div class="overlay"><div class="panel">
+    <h2>⭐ 升级卡牌</h2><div class="desc">点击一张未升级的卡选中，确认后将其强化为 ★ 形态（当前 ${p.deck.length} 张）。</div>
+    <div class="row" style="justify-content:center">${cards||'<span style="color:var(--dim)">已无卡可升级</span>'}</div>
+    ${bar}
+    <div class="center" style="margin-top:12px">${pick!=null?'':`<button class="btn" onclick="state.screen='rest';render()">返回</button>`}</div>
+  </div></div>`;
+}
+
+/* ===================== 启动 ===================== */
+state={screen:'title',player:{deck:[],relics:[]},map:null,log:[],pileView:null};
+window.addEventListener('keydown',e=>{ if(e.key==='Escape'&&state&&state.pileView)closePile(); });
+window.addEventListener('resize',()=>{ if(state&&state.screen==='map')requestAnimationFrame(drawMapLines); });
+document.addEventListener('click',e=>{ if(!e.target.closest('[data-tip]')){ tipPinned=null; const b=document.getElementById('tipbox'); if(b)b.classList.remove('show'); } });
+render();
+</script>
+</body>
+</html>

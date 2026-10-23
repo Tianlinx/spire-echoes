@@ -4,6 +4,8 @@
 >
 > 本项目是**对《杀戮尖塔》(Slay the Spire) 的拙劣模仿**，一个粉丝向的、纯用于学习与非商业娱乐目的的**同人致敬作品**。
 
+🎮 **在线试玩：https://tianlinx.github.io/spire-echoes/**
+
 ---
 
 ## 🛡️ 免责声明 / 叠甲（请务必读完）
@@ -32,13 +34,17 @@
 
 ## ▶️ 如何运行
 
-最简单的方式：
+### 在线试玩（推荐）
+
+**点开即玩：https://tianlinx.github.io/spire-echoes/**
+
+本项目已开启 GitHub Pages（source = `main` 分支根目录），无需下载、无需部署，浏览器直接打开就能开始爬塔。
+
+### 本地运行
 
 1. 下载本仓库
 2. 双击 `index.html`（或 `spire.html`）用浏览器打开
 3. 开玩
-
-（如需在线托管，可开启 GitHub Pages，指向本仓库根目录的 `index.html`。）
 
 ## 🧱 技术栈
 

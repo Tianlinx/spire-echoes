@@ -46,6 +46,7 @@
   .class-card.warrior:hover{border-color:var(--warrior);box-shadow:0 0 18px rgba(224,160,79,.4)}
   .class-card.hunter:hover{border-color:var(--hunter);box-shadow:0 0 18px rgba(127,207,154,.4)}
   .class-card.bot:hover{border-color:#7fd3ff;box-shadow:0 0 18px rgba(127,211,255,.4)}
+  .class-card.watcher:hover{border-color:#ffd479;box-shadow:0 0 18px rgba(255,212,121,.4)}
   .class-card .cbig{font-size:54px}
   .class-card .cn{font-size:19px;font-weight:700;margin:6px 0}
   .class-card .cb{color:var(--dim);font-size:12px;line-height:1.6}
@@ -112,6 +113,13 @@
   .pstats{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:160px}
   .orbs{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:2px}
   .orb{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:20px;padding:2px 8px;font-size:13px;color:#e8ecf7}
+  .stance{position:relative;display:flex;align-items:center;gap:4px;background:linear-gradient(180deg,rgba(255,212,121,.18),rgba(255,212,121,.08));border:1px solid rgba(255,212,121,.55);border-radius:20px;padding:3px 10px;margin-top:4px;font-size:13px;color:#ffe9b0;font-weight:700}
+  .stance .si{font-size:15px}
+  .stance.calm{background:linear-gradient(180deg,rgba(127,211,255,.18),rgba(127,211,255,.08));border-color:rgba(127,211,255,.55);color:#cfefff}
+  .stance.wrath{background:linear-gradient(180deg,rgba(255,113,134,.2),rgba(255,113,134,.08));border-color:rgba(255,113,134,.55);color:#ffd0d8}
+  .stance.divinity{background:linear-gradient(180deg,rgba(255,212,121,.28),rgba(255,159,67,.12));border-color:rgba(255,212,121,.7);color:#fff0c8}
+  .stance .tip{position:absolute;bottom:130%;left:50%;transform:translateX(-50%);min-width:200px;max-width:260px;background:#0d0f18;border:1px solid var(--gold);border-radius:9px;padding:8px 10px;font-size:12px;color:#e8ecf7;font-weight:400;line-height:1.45;box-shadow:0 8px 22px #000a;opacity:0;pointer-events:none;transition:opacity .15s;z-index:60}
+  .stance:hover .tip{opacity:1;pointer-events:auto}
   .orb.frost{border-color:#7fd3ff} .orb.lightning{border-color:#ffd166} .orb.dark{border-color:#b78bff}
 
   /* hand */
@@ -547,6 +555,54 @@ const CARDS = {
   coreNova:{name:'奇点爆发',type:'attack',cost:3,rarity:'rare',art:'💥',cls:'bot',
     desc:d=>`造成 <b>${d.dmg}</b> 点伤害，储能 <b>1</b> 层暗球。`, base:{dmg:18}, up:{dmg:24},
     play:(d,c)=>{c.attack(d.dmg);c.channel('dark',4);}},
+
+  /* ---- 修行者基础 ---- */
+  chop:{name:'平砍',type:'attack',cost:1,rarity:'starter',art:'🪓',cls:'watcher',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害。`, base:{dmg:6}, up:{dmg:9},
+    play:(d,c)=>c.attack(d.dmg)},
+  guard2:{name:'守心',type:'skill',cost:1,rarity:'starter',art:'🧘',cls:'watcher',
+    desc:d=>`获得 <b>${d.block}</b> 点护甲。`, base:{block:5}, up:{block:8},
+    play:(d,c)=>c.block(d.block)},
+  meditate:{name:'入定',type:'skill',cost:0,rarity:'starter',art:'☯️',cls:'watcher',
+    desc:d=>`进入<b>平静</b>姿态：获得 <b>6</b> 点护甲（处于平静时每回合开始再得 6 护甲）。`, base:{}, up:{},
+    play:(d,c)=>c.setStance('calm')},
+
+  /* ---- 修行者通用池 ---- */
+  zen:{name:'静心',type:'skill',cost:1,rarity:'common',art:'🌿',cls:'watcher',
+    desc:d=>`进入<b>平静</b>姿态：获得 <b>6</b> 点护甲。`, base:{}, up:{},
+    play:(d,c)=>c.setStance('calm')},
+  angry:{name:'怒意',type:'skill',cost:1,rarity:'common',art:'😤',cls:'watcher',
+    desc:d=>`进入<b>愤怒</b>姿态：攻击伤害 <b>×2</b>。`, base:{}, up:{},
+    play:(d,c)=>c.setStance('wrath')},
+  scry:{name:'观想',type:'skill',cost:1,rarity:'common',art:'👁️',cls:'watcher',
+    desc:d=>`凝神窥见前路，抽 <b>${d.draw}</b> 张牌。`, base:{draw:2}, up:{draw:3},
+    play:(d,c)=>c.draw(d.draw)},
+  palm:{name:'掌风',type:'attack',cost:1,rarity:'common',art:'🖐️',cls:'watcher',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害。`, base:{dmg:8}, up:{dmg:11},
+    play:(d,c)=>c.attack(d.dmg)},
+
+  divine:{name:'化神',type:'skill',cost:1,rarity:'uncommon',art:'🌟',cls:'watcher',
+    desc:d=>`进入<b>神性</b>姿态：攻击伤害 <b>×3</b>，但失去全部剩余能量。`, base:{}, up:{},
+    play:(d,c)=>c.setStance('divinity')},
+  collapse:{name:'崩拳',type:'attack',cost:2,rarity:'uncommon',art:'👊',cls:'watcher',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害（愤怒时 22，神性时 33）。`, base:{dmg:11}, up:{dmg:15},
+    play:(d,c)=>c.attack(d.dmg)},
+  ethereal:{name:'空灵',type:'skill',cost:0,rarity:'uncommon',art:'🕊️',cls:'watcher',
+    desc:d=>`进入<b>平静</b>姿态并抽 <b>1</b> 张牌。`, base:{}, up:{},
+    play:(d,c)=>{c.setStance('calm');c.draw(1);}},
+  insight:{name:'慧眼',type:'attack',cost:1,rarity:'uncommon',art:'🔯',cls:'watcher',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害，抽 <b>1</b> 张牌。`, base:{dmg:6}, up:{dmg:9},
+    play:(d,c)=>{c.attack(d.dmg);c.draw(1);}},
+
+  enlightenment:{name:'顿悟',type:'skill',cost:1,rarity:'rare',art:'💠',cls:'watcher',
+    desc:d=>`进入<b>神性</b>姿态并抽 <b>2</b> 张牌。`, base:{}, up:{},
+    play:(d,c)=>{c.setStance('divinity');c.draw(2);}},
+  oneness:{name:'万法归一',type:'attack',cost:2,rarity:'rare',art:'☯',cls:'watcher',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害（愤怒时 24，神性时 36）。`, base:{dmg:12}, up:{dmg:16},
+    play:(d,c)=>c.attack(d.dmg)},
+  finger:{name:'无相劫指',type:'attack',cost:2,rarity:'rare',art:'✨',cls:'watcher',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害（愤怒时 44，神性时 66）。`, base:{dmg:22}, up:{dmg:30},
+    play:(d,c)=>c.attack(d.dmg)},
 };
 
 /* ===================== 职业定义 ===================== */
@@ -581,10 +637,35 @@ const CLASSES = {
       rare:['fusion','tempest','coreNova'],
     },
   },
+  watcher:{
+    id:'watcher', name:'修行者', art:'🧘', maxHp:64, startRelic:'clearBell',
+    blurb:'以姿态流转证道的修行之人。平静守御、愤怒狂攻、神性爆发，于三种心境间切换，攻防随心。',
+    deck:[['chop',4],['guard2',4],['meditate',1]],
+    pool:{
+      common:['zen','angry','scry','palm'],
+      uncommon:['divine','collapse','ethereal','insight'],
+      rare:['enlightenment','oneness','finger'],
+    },
+  },
 };
 function classPool(cls,rarity){ return (CLASSES[cls]&&CLASSES[cls].pool[rarity])||[]; }
-function clsName(c){ return c==='hunter'?'暗影游侠':c==='bot'?'鸡煲':'铁甲战士'; }
-function clsArt(c){ return c==='hunter'?'🏹':c==='bot'?'🤖':'🦸'; }
+function clsName(c){ return c==='hunter'?'暗影游侠':c==='bot'?'鸡煲':c==='watcher'?'修行者':'铁甲战士'; }
+function clsArt(c){ return c==='hunter'?'🏹':c==='bot'?'🤖':c==='watcher'?'🧘':'🦸'; }
+const STANCE_INFO={
+  calm:{icon:'🧘',name:'平静',good:true,desc:'心境澄明：进入时获得 6 点护甲，且每回合开始再得 6 点护甲。'},
+  wrath:{icon:'😤',name:'愤怒',good:true,desc:'气血翻涌：处于愤怒时，你的所有攻击伤害 ×2。'},
+  divinity:{icon:'🌟',name:'神性',good:true,desc:'超凡入圣：处于神性时，攻击伤害 ×3，但进入时失去全部剩余能量。'},
+};
+function stanceMult(){ const s=state.player.stance; return s==='wrath'?2:s==='divinity'?3:1; }
+function stanceName(){ const s=state.player.stance; return s?STANCE_INFO[s].name:''; }
+function setStance(s){
+  if(state.player.stance===s)return;
+  state.player.stance=s;
+  if(s==='calm'){ state.player.block+=6; SFX.block(); }
+  if(s==='divinity'){ state.battle.energy=0; }
+  const n=STANCE_INFO[s].name;
+  log('进入'+n+'姿态'); toast('进入'+n+'姿态');
+}
 
 /* ===================== 储能球 ===================== */
 const ORB_MAX=3;
@@ -654,6 +735,8 @@ const RELICS = {
     onBattleStart(b){b.enemies.forEach(e=>e.statuses.poison=(e.statuses.poison||0)+1);toast('毒药瓶：施加 1 中毒');}},
   crackedCore:{name:'破损核心',art:'🔋',desc:'战斗开始时储能 1 层冰球（每回合开始获得护甲）。',
     onBattleStart(b){const p=state.player;p.orbs=p.orbs||[];if(p.orbs.length<ORB_MAX)p.orbs.push({type:'frost',val:3});toast('破损核心：储能 1 冰球');}},
+  clearBell:{name:'空明心印',art:'🔔',desc:'战斗开始时进入平静姿态（每回合开始获得 6 点护甲）。',
+    onBattleStart(b){const p=state.player;p.stance='calm';toast('空明心印：进入平静姿态');}},
   kunai:{name:'苦无',art:'🔪',desc:'每回合开始获得 1 点敏捷。',
     onTurnStart(b){state.player.statuses.dexterity=(state.player.statuses.dexterity||0)+1;}},
   thornRing:{name:'尖刺护符',art:'🌵',desc:'受到攻击时反弹 5 点伤害。',thorn:5},
@@ -706,7 +789,7 @@ function newGame(cls){
   state = {
     screen:'title', cls,
     player:{cls, hp:C.maxHp,maxHp:C.maxHp,block:0,energy:3,maxEnergy:3,gold:0,
-      deck:[],relics:[C.startRelic],orbs:[],
+      deck:[],relics:[C.startRelic],orbs:[],stance:null,
       statuses:{}},
     map:null, battle:null, reward:null, shop:null, event:null, removeReturn:null, cardget:null,
     selectedTarget:0, pileView:null, removePick:null, upgradePick:null, codex:false, log:[],
@@ -802,6 +885,8 @@ function startBattle(kind, enemyIds){
   state.battle=b;
   // 储能球：每场战斗清空后由起始遗物重新储能
   state.player.orbs=[];
+  // 姿态：每场战斗清空后由起始遗物重新进入
+  state.player.stance=null;
   // 遗物：战斗开始
   state.player.relics.forEach(r=>{const R=RELICS[r];if(R.onBattleStart)R.onBattleStart(b);});
   state.player.block=0;
@@ -818,6 +903,8 @@ function startPlayerTurn(first){
   // 玩家中毒结算
   if(state.player.statuses.poison){ state.player.hp-=state.player.statuses.poison; state.player.statuses.poison--; if(state.player.hp<=0){return gameOver();} }
   b.energy=state.player.maxEnergy;
+  // 平静姿态：每回合开始获得护甲
+  if(state.player.stance==='calm')state.player.block+=6;
   // 遗物回合开始
   state.player.relics.forEach(r=>{const R=RELICS[r];if(R.onTurnStart)R.onTurnStart(b);});
   // 持续类状态
@@ -861,8 +948,11 @@ function selectTarget(i){ if(state.battle.enemies[i]&&state.battle.enemies[i].hp
 function calcAttack(source,target,base,doubleStr){
   let d=base+(source.statuses.strength||0)*(doubleStr?2:1);
   if(source.statuses.weak)d=Math.floor(d*0.75);
-  if(source===state.player && state.player.relics.some(r=>RELICS[r].dmgBonus))
-    d+=state.player.relics.reduce((s,r)=>s+(RELICS[r].dmgBonus||0),0);
+  if(source===state.player){
+    if(state.player.relics.some(r=>RELICS[r].dmgBonus))
+      d+=state.player.relics.reduce((s,r)=>s+(RELICS[r].dmgBonus||0),0);
+    const sm=stanceMult(); if(sm>1)d=Math.floor(d*sm);
+  }
   return Math.max(0,d);
 }
 function applyDamage(target,amount,isAttack,source){
@@ -907,6 +997,7 @@ function makeCtx(){
     enemyStatusAll:(name,n)=>b.enemies.forEach(e=>{if(e.hp>0)e.statuses[name]=(e.statuses[name]||0)+n;}),
     playerStatus:(name,n)=>{state.player.statuses[name]=(state.player.statuses[name]||0)+n;},
     channel:(type,val)=>{const p=state.player;p.orbs=p.orbs||[];if(p.orbs.length>=ORB_MAX)p.orbs.shift();p.orbs.push({type,val});SFX.charge();log(`储能 ${ORB_INFO[type].name}`);},
+    setStance:(s)=>setStance(s),
     draw:(n)=>drawCards(n),
     energy:(n)=>{b.energy+=n;},
     damageSelf:(n)=>{state.player.hp=Math.max(0,state.player.hp-n);},
@@ -1320,7 +1411,7 @@ function loadGame(){
     state={screen:'map',cls:d.player.cls,
       player:{cls:d.player.cls,hp:d.player.hp,maxHp:d.player.maxHp,block:0,energy:3,maxEnergy:3,gold:d.player.gold,
         deck:d.player.deck,relics:d.player.relics,statuses:{}},
-      map:d.map,battle:null,reward:null,shop:null,event:null,removeReturn:null,selectedTarget:0,pileView:null,log:[]};
+      map:d.map,battle:null,reward:null,shop:null,event:null,removeReturn:null,selectedTarget:0,pileView:null,log:[],stance:null};
     return true;
   }catch(e){return false;}
 }
@@ -1368,6 +1459,12 @@ function orbsHTML(p){
   const chips=p.orbs.map(o=>{const info=ORB_INFO[o.type];const v=o.val+f;
     return `<span class="orb ${o.type}" data-tip="<b>${info.name}</b>：${info.desc}${f>0?(' 当前核心过载 +'+f+'，实际 '+v+'。'):''}">${info.icon}<b>${v}</b></span>`;}).join('');
   return `<div class="orbs">${chips}</div>`;
+}
+function stanceHTML(p){
+  const s=p.stance; if(!s||!STANCE_INFO[s])return '';
+  const info=STANCE_INFO[s];
+  return `<div class="stance ${s}"><span class="si">${info.icon}</span><span class="sn">${info.name}</span>
+    <div class="tip"><b>${info.name}</b><br>${info.desc}</div></div>`;
 }
 /* ===================== 牌堆 / 卡组浏览 ===================== */
 function cardFaceHTML(inst,extraClass){
@@ -1440,6 +1537,8 @@ function codexHTML(){
     {t:'🏹 暗影游侠 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='hunter'&&CARDS[id].rarity!=='starter')},
     {t:'🤖 鸡煲 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='bot'&&CARDS[id].rarity==='starter')},
     {t:'🤖 鸡煲 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='bot'&&CARDS[id].rarity!=='starter')},
+    {t:'🧘 修行者 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='watcher'&&CARDS[id].rarity==='starter')},
+    {t:'🧘 修行者 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='watcher'&&CARDS[id].rarity!=='starter')},
   ];
   const body=groups.map(g=>{ if(!g.ids.length)return''; const cards=g.ids.map(id=>cardFaceHTML({id,upgraded:false},'small')).join(''); return `<div class="cgroup"><h3>${g.t} · ${g.ids.length} 张</h3><div class="mgrid">${cards}</div></div>`; }).join('');
   return `<div class="modal" onclick="if(event.target===this)closeCodex()"><div class="mpanel">
@@ -1493,6 +1592,11 @@ function titleHTML(){
         <div class="cbig">🤖</div><div class="cn">鸡煲</div>
         <div class="cb">${CLASSES.bot.blurb}</div>
         <div class="chp">❤️ ${CLASSES.bot.maxHp} 生命 · 起始遗物：破损核心</div>
+      </div>
+      <div class="class-card watcher" onclick="newGame('watcher')">
+        <div class="cbig">🧘</div><div class="cn">修行者</div>
+        <div class="cb">${CLASSES.watcher.blurb}</div>
+        <div class="chp">❤️ ${CLASSES.watcher.maxHp} 生命 · 起始遗物：空明心印</div>
       </div>
     </div>
     ${cont}
@@ -1629,10 +1733,11 @@ function battleHTML(){
       <div class="player-side">
         <div class="intent" style="opacity:.0">·</div>
         <div class="psprite" id="playerSprite">${clsArt(p.cls)}</div>
-        <div class="ename">${p.cls==='hunter'?'游侠':p.cls==='bot'?'鸡煲':'勇者'}</div>
+        <div class="ename">${clsName(p.cls)}</div>
         ${blockHTML}
         <div class="pstats">${pStatsHTML}</div>
         ${orbsHTML(p)}
+        ${stanceHTML(p)}
       </div>
       <div class="enemies">${enemiesHTML}</div>
       <div class="logcenter"><div class="lhead">战 斗 记 录</div><div class="lbody">${state.log.slice(0,6).map((l,i)=>`<div class="logline ${i===0?'fresh':''}">· ${l}</div>`).join('')}</div></div>

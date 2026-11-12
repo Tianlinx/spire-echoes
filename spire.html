@@ -85,6 +85,12 @@
   .remove-bar{margin:18px auto 0;display:flex;gap:12px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--gold);border-radius:10px;padding:10px 16px;max-width:560px}
   .upgrade-bar{margin:18px auto 0;display:flex;gap:12px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--gold);border-radius:10px;padding:10px 16px;max-width:560px}
   .map-hint{text-align:center;color:var(--dim);font-size:13px;padding:10px 12px}
+  .node.pending{border-color:#fff;box-shadow:0 0 20px rgba(255,255,255,.7);transform:scale(1.15);animation:none}
+  .map-confirm{display:flex;gap:14px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--gold);border-radius:12px;padding:12px 20px;margin:14px auto 0;max-width:560px;font-size:14px}
+  .map-confirm .btn{padding:8px 18px}
+  .evt-opt.selected{border-color:var(--gold);box-shadow:0 0 14px rgba(232,196,104,.5)}
+  .evt-confirm{margin-top:14px;display:flex;gap:12px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--gold);border-radius:10px;padding:10px 16px}
+  .evt-confirm .btn{padding:6px 16px}
 
   /* ===== Battle ===== */
   .battle{flex:1;display:flex;flex-direction:column;min-height:0}
@@ -253,12 +259,27 @@
 /* ===================== 工具 ===================== */
 const $ = s => document.querySelector(s);
 const rng = n => Math.floor(Math.random()*n);
-// 深度系数：随层数从前期（便宜/少）平滑过渡到后期（贵/多）
-function depthScale(floor){
+// ===== 经济系统（重做版）=====
+// 层数进度 t：0（第一层）~ 1（BOSS 层），用于平滑缩放收益与售价
+function floorT(floor){
   const N=(state&&state.map)?state.map.N:10;
-  const t=N>1?Math.max(0,Math.min(1,floor/(N-1))):0;
-  return 0.7+0.9*t;   // floor0≈0.70 → floor(N-1)≈1.60
+  return N>1?clamp(floor/(N-1),0,1):0;
 }
+// 经济参数：base=基础值，rng=随机浮动上限，scale=随层数增长系数
+const ECON = {
+  battle:{base:16, rng:10, scale:0.35},  // 普通战斗金币收益
+  elite :{base:30, rng:16, scale:0.45},  // 精英战斗收益
+  boss  :{base:65, rng:30, scale:0.30},  // BOSS 收益
+  card  :{base:20, rng:14, scale:0.30},  // 商店卡牌售价
+  relic :{base:45, rng:28, scale:0.45},  // 商店遗物售价
+  remove:{base:40, scale:25},            // 移除卡牌费用 = base + scale·t
+  buyRelic:{base:30, scale:20},          // 事件购入遗物费用 = base + scale·t
+  loot  :{base:35, scale:30},            // 事件取走财物收益 = base + scale·t
+};
+// 乘法型经济值：(base + 随机) × (1 + scale·t)
+function econMul(v,t){ return Math.round((v.base + rng(v.rng||0)) * (1 + (v.scale||0)*t)); }
+// 加法型经济值：base + scale·t
+function econAdd(v,t){ return Math.round(v.base + (v.scale||0)*t); }
 const pick = a => a[rng(a.length)];
 const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi,v));
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
@@ -766,13 +787,13 @@ const EVENTS = [
     ]},
   {name:'流浪商人',art:'🧳',desc:'一名披斗篷的商人摊开货物，眼中闪着狡黠的光。',
     options:[
-      {label:()=>{const c=Math.round(40*depthScale(state.map&&state.map.current?state.map.current.floor:0));return `购入未知遗物（花费 ${c} 金）`;},sub:'仅当金充足且仍有遗物可获',act(){const c=Math.round(40*depthScale(state.map&&state.map.current?state.map.current.floor:0));if(state.player.gold>=c){state.player.gold-=c;grantRandomRelic();}else toast('金币不足');}},
+      {label:()=>{const t=floorT(state.map&&state.map.current?state.map.current.floor:0);const c=econAdd(ECON.buyRelic,t);return `购入未知遗物（花费 ${c} 金）`;},sub:'仅当金充足且仍有遗物可获',act(){const t=floorT(state.map&&state.map.current?state.map.current.floor:0);const c=econAdd(ECON.buyRelic,t);if(state.player.gold>=c){state.player.gold-=c;grantRandomRelic();}else toast('金币不足');}},
       {label:'婉拒并离开',sub:'',act(){}},
     ]},
   {name:'受伤的旅人',art:'🤕',desc:'一名旅人倒在路边，气息奄奄。他求你施救，亦或……取走他仅存的财物。',
     options:[
       {label:'施救（失去 5 生命，获得 1 件随机遗物）',sub:'',act(){state.player.hp=Math.max(1,state.player.hp-5);grantRandomRelic();}},
-      {label:()=>{const g=Math.round(50*depthScale(state.map&&state.map.current?state.map.current.floor:0));return `取走财物（获得 ${g} 金）`;},sub:'',act(){const g=Math.round(50*depthScale(state.map&&state.map.current?state.map.current.floor:0));state.player.gold+=g;}},
+      {label:()=>{const t=floorT(state.map&&state.map.current?state.map.current.floor:0);const g=econAdd(ECON.loot,t);return `取走财物（获得 ${g} 金）`;},sub:'',act(){const t=floorT(state.map&&state.map.current?state.map.current.floor:0);const g=econAdd(ECON.loot,t);state.player.gold+=g;}},
     ]},
   {name:'双生石碑',art:'🪨',desc:'两座石碑遥遥相对，一者刻着力量，一者刻着敏捷。',
     options:[
@@ -792,6 +813,7 @@ function newGame(cls){
       deck:[],relics:[C.startRelic],orbs:[],stance:null,
       statuses:{}},
     map:null, battle:null, reward:null, shop:null, event:null, removeReturn:null, cardget:null,
+    pendingNode:null, pendingEvent:null,
     selectedTarget:0, pileView:null, removePick:null, upgradePick:null, codex:false, log:[],
   };
   C.deck.forEach(([id,n])=>{ for(let i=0;i<n;i++) state.player.deck.push({id,upgraded:false}); });
@@ -858,14 +880,14 @@ function nodeType(i,N){
 }
 function genShop(floor){
   const cls=state.player.cls;
-  const s=depthScale(floor||0);
-  const shop={cards:[],relics:[],removeCost:Math.round(75*s)};
+  const t=floorT(floor||0);
+  const shop={cards:[],relics:[],removeCost:econAdd(ECON.remove,t)};
   const commons=shuffle(classPool(cls,'common')).slice(0,2);
   const uncommons=shuffle(classPool(cls,'uncommon')).slice(0,1);
-  commons.concat(uncommons).forEach(id=>shop.cards.push({id,upgraded:false,cost:Math.round((rng(40)+45)*s)}));
+  commons.concat(uncommons).forEach(id=>shop.cards.push({id,upgraded:false,cost:econMul(ECON.card,t)}));
   // 遗物：1 件未拥有
   const avail=Object.keys(RELICS).filter(r=>!state.player.relics.includes(r));
-  if(avail.length)shop.relics.push({id:pick(avail),cost:Math.round((rng(60)+130)*s)});
+  if(avail.length)shop.relics.push({id:pick(avail),cost:econMul(ECON.relic,t)});
   return shop;
 }
 
@@ -1261,11 +1283,11 @@ function battleWin(){
   state.player.relics.forEach(r=>{const R=RELICS[r];if(R.onBattleEnd)R.onBattleEnd(state.player);});
   log('战斗胜利！');
   const isBoss=kind==='boss', isElite=kind==='elite';
-  const s=depthScale((state.map&&state.map.current)?state.map.current.floor:0);
+  const s=floorT((state.map&&state.map.current)?state.map.current.floor:0);
   let gold=0, cards=[], relic=null;
-  if(isBoss){ gold=Math.round((rng(40)+60)*s); relic=grantRandomRelic(false); }
-  else if(isElite){ gold=Math.round((rng(20)+35)*s); relic=grantRandomRelic(false); }
-  else gold=Math.round((rng(12)+15)*s);
+  if(isBoss){ gold=econMul(ECON.boss,s); relic=grantRandomRelic(false); }
+  else if(isElite){ gold=econMul(ECON.elite,s); relic=grantRandomRelic(false); }
+  else gold=econMul(ECON.battle,s);
   const rarity = (isElite||isBoss)?pick(['uncommon','uncommon','rare']):pick(['common','common','uncommon']);
   const pool=classPool(state.player.cls,rarity);
   cards=shuffle(pool).slice(0,3);
@@ -1290,16 +1312,24 @@ function chooseReward(cardId){
 function addCardToDeck(id,up){state.player.deck.push({id,upgraded:!!up});}
 
 /* ===================== 节点处理 ===================== */
+function nodeReachable(floor,idx){
+  const m=state.map;
+  if(floor===0 && m.current===null) return true;
+  if(m.current && floor===m.current.floor+1 && m.floors[m.current.floor][m.current.idx].next.includes(idx)) return true;
+  return false;
+}
 function selectNode(floor,idx){
   unlockAudio();
-  const m=state.map;
-  if(floor===0 && m.current===null){
-    m.current={floor,idx}; m.floors[0][idx].visited=true; saveGame(); enterNode(floor,idx); return;
-  }
-  if(m.current && floor===m.current.floor+1 && m.floors[m.current.floor][m.current.idx].next.includes(idx)){
-    m.current={floor,idx}; m.floors[floor][idx].visited=true; saveGame(); enterNode(floor,idx); return;
-  }
+  if(!nodeReachable(floor,idx)) return;
+  state.pendingNode={floor,idx}; SFX.click(); render();
 }
+function confirmNode(){
+  const pn=state.pendingNode; if(!pn) return;
+  const {floor,idx}=pn; state.pendingNode=null;
+  const m=state.map;
+  m.current={floor,idx}; m.floors[floor][idx].visited=true; saveGame(); enterNode(floor,idx);
+}
+function cancelNode(){ state.pendingNode=null; SFX.click(); render(); }
 function enterNode(floor,idx){
   const node=state.map.floors[floor][idx];
   if(node.type==='battle'){
@@ -1322,6 +1352,7 @@ function afterNode(){
   state.screen='map'; saveGame(); render();
 }
 function eventChoice(i){
+  state.pendingEvent=null;
   const opt=state.event.def.options[i];
   const before=state.screen;
   if(opt.act)opt.act();
@@ -1329,6 +1360,9 @@ function eventChoice(i){
   if(state.screen!==before){ render(); return; }
   afterNode();
 }
+function selectEvent(i){ state.pendingEvent=i; SFX.click(); render(); }
+function confirmEvent(){ const i=state.pendingEvent; if(i==null)return; state.pendingEvent=null; eventChoice(i); }
+function cancelEvent(){ state.pendingEvent=null; SFX.click(); render(); }
 
 /* ===================== 商店 ===================== */
 function buyCard(i){
@@ -1411,7 +1445,7 @@ function loadGame(){
     state={screen:'map',cls:d.player.cls,
       player:{cls:d.player.cls,hp:d.player.hp,maxHp:d.player.maxHp,block:0,energy:3,maxEnergy:3,gold:d.player.gold,
         deck:d.player.deck,relics:d.player.relics,statuses:{}},
-      map:d.map,battle:null,reward:null,shop:null,event:null,removeReturn:null,selectedTarget:0,pileView:null,log:[],stance:null};
+      map:d.map,battle:null,reward:null,shop:null,event:null,removeReturn:null,pendingNode:null,pendingEvent:null,selectedTarget:0,pileView:null,log:[],stance:null};
     return true;
   }catch(e){return false;}
 }
@@ -1640,18 +1674,20 @@ function relicbarHTML(){
 }
 function mapHTML(){
   const m=state.map;
+  const pending=state.pendingNode;
   let floorsHTML='';
   for(let i=0;i<m.N;i++){
     const nodes=m.floors[i];
     let nodesHTML=`<div class="flbl">${i===m.N-1?'BOSS':(i+1)+'F'}</div>`;
     nodes.forEach((node,idx)=>{
       const isCur = m.current && m.current.floor===i && m.current.idx===idx;
-      const reachable = (m.current===null && i===0) ||
-        (m.current && i===m.current.floor+1 && m.floors[m.current.floor][m.current.idx].next.includes(idx));
+      const reachable = nodeReachable(i,idx);
+      const isPending = pending && pending.floor===i && pending.idx===idx;
       const cls=['node'];
       if(node.visited)cls.push('visited');
       if(isCur)cls.push('current');
       if(reachable)cls.push('reachable');
+      if(isPending)cls.push('pending');
       if(!reachable && !isCur && !node.visited)cls.push('locked');
       const icon={battle:'⚔️',elite:'💀',boss:'👑',event:'❓',shop:'🛒',rest:'🔥'}[node.type];
       const lbl={battle:'战斗',elite:'精英',boss:'BOSS',event:'事件',shop:'商店',rest:'休息'}[node.type];
@@ -1659,8 +1695,20 @@ function mapHTML(){
     });
     floorsHTML+=`<div class="floor">${nodesHTML}</div>`;
   }
-  return `${topbarHTML()}<div class="map-wrap"><svg class="maplines" id="maplines"></svg>${floorsHTML}</div>
-    <div class="map-hint">从最左端开始，逐层向右点击高亮节点前进 · 共 ${m.N} 层 · 最右端为 BOSS</div>`;
+  let footer;
+  if(pending){
+    const pn=m.floors[pending.floor][pending.idx];
+    const pi={battle:'⚔️',elite:'💀',boss:'👑',event:'❓',shop:'🛒',rest:'🔥'}[pn.type];
+    const pl={battle:'战斗',elite:'精英',boss:'BOSS',event:'事件',shop:'商店',rest:'休息'}[pn.type];
+    footer=`<div class="map-confirm">
+      <span>确认前往 <b style="font-size:15px">${pi} ${pl}</b> 节点？</span>
+      <button class="btn primary" onclick="confirmNode()">确认前往 ▸</button>
+      <button class="btn" onclick="cancelNode()">取消</button>
+    </div>`;
+  } else {
+    footer=`<div class="map-hint">从最左端开始，点击高亮节点<b>选中</b>，再点「确认前往」进入 · 共 ${m.N} 层 · 最右端为 BOSS</div>`;
+  }
+  return `${topbarHTML()}<div class="map-wrap"><svg class="maplines" id="maplines"></svg>${floorsHTML}</div>${footer}`;
 }
 function drawMapLines(){
   const wrap=document.querySelector('.map-wrap'); if(!wrap)return;
@@ -1865,10 +1913,20 @@ function confirmRemove(){
 function eventHTML(){
   if(!state.event)return '<div class="overlay"></div>';
   const ev=state.event.def;
-  let opts=ev.options.map((o,i)=>`<button class="btn evt-opt" onclick="eventChoice(${i})">${(typeof o.label==='function'?o.label():o.label)}<small>${o.sub||''}</small></button>`).join('');
+  const pe=state.pendingEvent;
+  let opts=ev.options.map((o,i)=>{
+    const sel=pe===i?'selected':'';
+    return `<button class="btn evt-opt ${sel}" onclick="selectEvent(${i})">${(typeof o.label==='function'?o.label():o.label)}<small>${o.sub||''}</small></button>`;
+  }).join('');
+  let bar='';
+  if(pe!=null){
+    const o=ev.options[pe];
+    bar=`<div class="evt-confirm">确认选择「<b>${typeof o.label==='function'?o.label():o.label}</b>」？ <button class="btn primary" onclick="confirmEvent()">确认</button> <button class="btn" onclick="cancelEvent()">再想想</button></div>`;
+  }
   return `${topbarHTML()}<div class="overlay"><div class="panel">
     <h2>${ev.art} ${ev.name}</h2><div class="desc">${ev.desc}</div>
     <div class="row" style="flex-direction:column">${opts}</div>
+    ${bar}
   </div></div>`;
 }
 function endHTML(win){
@@ -1912,7 +1970,7 @@ function upgradeHTML(){
 }
 
 /* ===================== 启动 ===================== */
-state={screen:'title',player:{deck:[],relics:[]},map:null,log:[],pileView:null};
+state={screen:'title',player:{deck:[],relics:[]},map:null,log:[],pileView:null,pendingNode:null,pendingEvent:null};
 window.addEventListener('keydown',e=>{ if(e.key==='Escape'&&state&&state.pileView)closePile(); });
 window.addEventListener('resize',()=>{ if(state&&state.screen==='map')requestAnimationFrame(drawMapLines); });
 document.addEventListener('click',e=>{ if(!e.target.closest('[data-tip]')){ tipPinned=null; const b=document.getElementById('tipbox'); if(b)b.classList.remove('show'); } });

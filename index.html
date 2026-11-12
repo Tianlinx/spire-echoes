@@ -45,6 +45,7 @@
   .class-card:hover{transform:translateY(-6px)}
   .class-card.warrior:hover{border-color:var(--warrior);box-shadow:0 0 18px rgba(224,160,79,.4)}
   .class-card.hunter:hover{border-color:var(--hunter);box-shadow:0 0 18px rgba(127,207,154,.4)}
+  .class-card.bot:hover{border-color:#7fd3ff;box-shadow:0 0 18px rgba(127,211,255,.4)}
   .class-card .cbig{font-size:54px}
   .class-card .cn{font-size:19px;font-weight:700;margin:6px 0}
   .class-card .cb{color:var(--dim);font-size:12px;line-height:1.6}
@@ -109,6 +110,9 @@
   .psprite{width:110px;height:120px;border-radius:18px;display:flex;align-items:center;justify-content:center;
     font-size:56px;background:linear-gradient(180deg,#20303a,#16222a);border:2px solid var(--line)}
   .pstats{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:160px}
+  .orbs{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin-top:2px}
+  .orb{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:20px;padding:2px 8px;font-size:13px;color:#e8ecf7}
+  .orb.frost{border-color:#7fd3ff} .orb.lightning{border-color:#ffd166} .orb.dark{border-color:#b78bff}
 
   /* hand */
   .handzone{display:flex;align-items:flex-end;justify-content:center;gap:12px;padding:8px 14px 18px;min-height:230px;position:relative}
@@ -293,6 +297,7 @@ const SFX={
   win(){ tone(523,0.12,'triangle',0.13); setTimeout(()=>tone(659,0.12,'triangle',0.13),110); setTimeout(()=>tone(784,0.22,'triangle',0.13),230); },
   lose(){ tone(330,0.2,'sawtooth',0.11,210); setTimeout(()=>tone(220,0.32,'sawtooth',0.11,110),150); },
   select(){ tone(600,0.05,'sine',0.07); },
+  charge(){ tone(660,0.08,'square',0.10,980); setTimeout(()=>tone(880,0.06,'square',0.08,1200),60); },
 };
 function toggleMute(){ muted=!muted; if(!muted)unlockAudio(); render(); }
 
@@ -494,6 +499,54 @@ const CARDS = {
   rage:{name:'暴怒',type:'power',cost:1,rarity:'uncommon',art:'🔥',cls:'neutral',
     desc:d=>`每回合开始获得 <b>1</b> 点力量，但失去 <b>${d.lose}</b> 生命。`, base:{lose:2}, up:{lose:1},
     play:(d,c)=>{c.playerStatus('rage',d.lose);}},
+
+  /* ---- 鸡煲（机器人）基础 ---- */
+  peck:{name:'啄击',type:'attack',cost:1,rarity:'starter',art:'🐔',cls:'bot',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害。`, base:{dmg:6}, up:{dmg:9},
+    play:(d,c)=>c.attack(d.dmg)},
+  shell:{name:'硬壳',type:'skill',cost:1,rarity:'starter',art:'🥚',cls:'bot',
+    desc:d=>`获得 <b>${d.block}</b> 点护甲。`, base:{block:5}, up:{block:8},
+    play:(d,c)=>c.block(d.block)},
+  boot:{name:'启动协议',type:'skill',cost:1,rarity:'starter',art:'🔌',cls:'bot',
+    desc:d=>`储能 <b>1</b> 层雷球（每回合开始对所有敌人造成等同层数的伤害）。`, base:{v:4}, up:{v:6},
+    play:(d,c)=>c.channel('lightning',d.v)},
+
+  /* ---- 鸡煲通用池 ---- */
+  frostChannel:{name:'凝霜',type:'skill',cost:1,rarity:'common',art:'❄️',cls:'bot',
+    desc:d=>`储能 <b>1</b> 层冰球（每回合开始获得等同层数的护甲）。`, base:{fr:3}, up:{fr:5},
+    play:(d,c)=>c.channel('frost',d.fr)},
+  boltChannel:{name:'蓄雷',type:'skill',cost:1,rarity:'common',art:'⚡',cls:'bot',
+    desc:d=>`储能 <b>1</b> 层雷球（每回合开始对所有敌人造成等同层数的伤害）。`, base:{bo:4}, up:{bo:6},
+    play:(d,c)=>c.channel('lightning',d.bo)},
+  beam:{name:'射线',type:'attack',cost:1,rarity:'common',art:'🔆',cls:'bot',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害。`, base:{dmg:5}, up:{dmg:7},
+    play:(d,c)=>c.attack(d.dmg)},
+  guard:{name:'装甲协议',type:'skill',cost:1,rarity:'common',art:'🛡️',cls:'bot',
+    desc:d=>`获得 <b>${d.block}</b> 点护甲。`, base:{block:6}, up:{block:9},
+    play:(d,c)=>c.block(d.block)},
+
+  overcharge:{name:'超频核心',type:'power',cost:1,rarity:'uncommon',art:'⚙️',cls:'bot',
+    desc:d=>`每回合开始，你的所有储能球效果 <b>+${d.f}</b>。`, base:{f:2}, up:{f:3},
+    play:(d,c)=>c.playerStatus('focus',d.f)},
+  storm:{name:'雷暴',type:'attack',cost:2,rarity:'uncommon',art:'🌩️',cls:'bot',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害，并储能 <b>1</b> 层雷球。`, base:{dmg:8}, up:{dmg:11},
+    play:(d,c)=>{c.attack(d.dmg);c.channel('lightning',4);}},
+  virus:{name:'病毒注入',type:'skill',cost:1,rarity:'uncommon',art:'🦠',cls:'bot',
+    desc:d=>`储能 <b>1</b> 层暗球（每回合开始对所有敌人施加等同层数的中毒）。`, base:{vi:3}, up:{vi:5},
+    play:(d,c)=>c.channel('dark',d.vi)},
+  repair:{name:'修复协议',type:'skill',cost:1,rarity:'uncommon',art:'🔧',cls:'bot',
+    desc:d=>`获得 <b>${d.block}</b> 点护甲，抽 <b>1</b> 张牌。`, base:{block:8}, up:{block:11},
+    play:(d,c)=>{c.block(d.block);c.draw(1);}},
+
+  fusion:{name:'聚变核心',type:'power',cost:2,rarity:'rare',art:'☀️',cls:'bot',
+    desc:d=>`获得 <b>${d.f}</b> 点核心过载（储能球效果 +${d.f}），并立即储能冰/雷/暗球各 <b>1</b> 层。`, base:{f:2}, up:{f:3},
+    play:(d,c)=>{c.playerStatus('focus',d.f);c.channel('frost',3);c.channel('lightning',4);c.channel('dark',3);}},
+  tempest:{name:'风暴脉冲',type:'attack',cost:2,rarity:'rare',art:'🌀',cls:'bot',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害 <b>${d.times}</b> 次。`, base:{dmg:6,times:3}, up:{dmg:8,times:3},
+    play:(d,c)=>{for(let i=0;i<d.times;i++)c.attack(d.dmg);}},
+  coreNova:{name:'奇点爆发',type:'attack',cost:3,rarity:'rare',art:'💥',cls:'bot',
+    desc:d=>`造成 <b>${d.dmg}</b> 点伤害，储能 <b>1</b> 层暗球。`, base:{dmg:18}, up:{dmg:24},
+    play:(d,c)=>{c.attack(d.dmg);c.channel('dark',4);}},
 };
 
 /* ===================== 职业定义 ===================== */
@@ -518,8 +571,28 @@ const CLASSES = {
       rare:['deathmark','shadowstep','venomstorm','assassinate'],
     },
   },
+  bot:{
+    id:'bot', name:'鸡煲', art:'🤖', maxHp:70, startRelic:'crackedCore',
+    blurb:'机械与储能球的精密造物。凝霜、蓄雷、病毒轮转，用冰盾、雷伤与暗毒把敌人慢慢磨穿。',
+    deck:[['peck',4],['shell',4],['boot',1]],
+    pool:{
+      common:['frostChannel','boltChannel','beam','guard'],
+      uncommon:['overcharge','storm','virus','repair'],
+      rare:['fusion','tempest','coreNova'],
+    },
+  },
 };
 function classPool(cls,rarity){ return (CLASSES[cls]&&CLASSES[cls].pool[rarity])||[]; }
+function clsName(c){ return c==='hunter'?'暗影游侠':c==='bot'?'鸡煲':'铁甲战士'; }
+function clsArt(c){ return c==='hunter'?'🏹':c==='bot'?'🤖':'🦸'; }
+
+/* ===================== 储能球 ===================== */
+const ORB_MAX=3;
+const ORB_INFO={
+  frost:{icon:'❄️',name:'冰球',desc:'每回合开始为你提供等同层数的护甲。'},
+  lightning:{icon:'⚡',name:'雷球',desc:'每回合开始对所有敌人造成等同层数的伤害（受易伤加成）。'},
+  dark:{icon:'🌑',name:'暗球',desc:'每回合开始对所有敌人施加等同层数的中毒。'},
+};
 
 /* ===================== 敌人定义 ===================== */
 // ai(e, turn) -> intent; intent.type: attack|defend|buff|debuff|attack_def|attack_debuff|multi
@@ -579,6 +652,8 @@ const RELICS = {
   /* 新增 */
   poisonVial:{name:'毒药瓶',art:'🧪',desc:'战斗开始时对所有敌人施加 1 层中毒。',
     onBattleStart(b){b.enemies.forEach(e=>e.statuses.poison=(e.statuses.poison||0)+1);toast('毒药瓶：施加 1 中毒');}},
+  crackedCore:{name:'破损核心',art:'🔋',desc:'战斗开始时储能 1 层冰球（每回合开始获得护甲）。',
+    onBattleStart(b){const p=state.player;p.orbs=p.orbs||[];if(p.orbs.length<ORB_MAX)p.orbs.push({type:'frost',val:3});toast('破损核心：储能 1 冰球');}},
   kunai:{name:'苦无',art:'🔪',desc:'每回合开始获得 1 点敏捷。',
     onTurnStart(b){state.player.statuses.dexterity=(state.player.statuses.dexterity||0)+1;}},
   thornRing:{name:'尖刺护符',art:'🌵',desc:'受到攻击时反弹 5 点伤害。',thorn:5},
@@ -631,7 +706,7 @@ function newGame(cls){
   state = {
     screen:'title', cls,
     player:{cls, hp:C.maxHp,maxHp:C.maxHp,block:0,energy:3,maxEnergy:3,gold:0,
-      deck:[],relics:[C.startRelic],
+      deck:[],relics:[C.startRelic],orbs:[],
       statuses:{}},
     map:null, battle:null, reward:null, shop:null, event:null, removeReturn:null, cardget:null,
     selectedTarget:0, pileView:null, removePick:null, upgradePick:null, codex:false, log:[],
@@ -725,6 +800,8 @@ function startBattle(kind, enemyIds){
     hand:[], discard:[], exhaust:[], busy:false, target:0,
   };
   state.battle=b;
+  // 储能球：每场战斗清空后由起始遗物重新储能
+  state.player.orbs=[];
   // 遗物：战斗开始
   state.player.relics.forEach(r=>{const R=RELICS[r];if(R.onBattleStart)R.onBattleStart(b);});
   state.player.block=0;
@@ -751,6 +828,9 @@ function startPlayerTurn(first){
   if(state.player.statuses.deathmark)enemyStatusAllProxy(b);
   if(state.player.statuses.shadowstep)state.player.statuses.dexterity=(state.player.statuses.dexterity||0)+state.player.statuses.shadowstep;
   if(state.player.statuses.rage){ state.player.statuses.strength=(state.player.statuses.strength||0)+1; state.player.hp=Math.max(0,state.player.hp-(state.player.statuses.rage||0)); if(state.player.hp<=0)return gameOver(); }
+  // 储能球：每回合开始脉冲
+  pulseOrbs();
+  if(state.battle.enemies.every(e=>e.hp<=0)){ checkDeaths(); if(state.battle.kind==='done')return; }
   // 抽牌
   drawCards(5 + (b.drawBonus||0));
   b.drawBonus=0;
@@ -826,6 +906,7 @@ function makeCtx(){
     enemyStatus:(name,n)=>{const e=tgtEnemy();if(e&&e.hp>0)e.statuses[name]=(e.statuses[name]||0)+n;},
     enemyStatusAll:(name,n)=>b.enemies.forEach(e=>{if(e.hp>0)e.statuses[name]=(e.statuses[name]||0)+n;}),
     playerStatus:(name,n)=>{state.player.statuses[name]=(state.player.statuses[name]||0)+n;},
+    channel:(type,val)=>{const p=state.player;p.orbs=p.orbs||[];if(p.orbs.length>=ORB_MAX)p.orbs.shift();p.orbs.push({type,val});SFX.charge();log(`储能 ${ORB_INFO[type].name}`);},
     draw:(n)=>drawCards(n),
     energy:(n)=>{b.energy+=n;},
     damageSelf:(n)=>{state.player.hp=Math.max(0,state.player.hp-n);},
@@ -983,6 +1064,24 @@ function playCard(i){ playCardAnimated(i,null); }
 function checkDeaths(){
   const b=state.battle; if(!b||b.kind==='done')return;
   if(b.enemies.every(e=>e.hp<=0))battleWin();
+}
+/* 储能球脉冲：每回合开始按球类型结算 */
+function pulseOrbs(){
+  const p=state.player, b=state.battle;
+  if(!p.orbs||!p.orbs.length)return;
+  const f=(p.statuses.focus||0);
+  p.orbs.forEach(o=>{
+    const v=o.val+f;
+    if(o.type==='frost'){
+      p.block+=v; SFX.block(); floatText('#playerSprite','🛡'+v,'#6fb7e0'); log(`冰球脉冲：获得 ${v} 护甲`);
+    } else if(o.type==='lightning'){
+      b.enemies.forEach(e=>{ if(e.hp>0){ const before=e.hp; applyDamage(e,v,true,state.player); const real=before-e.hp; if(real>0)floatText('#enemySprite'+e.idx,'-'+real,'#ffd166'); } });
+      log(`雷球脉冲：对全体造成 ${v} 伤害`);
+    } else if(o.type==='dark'){
+      b.enemies.forEach(e=>{ if(e.hp>0)e.statuses.poison=(e.statuses.poison||0)+v; });
+      log(`暗球脉冲：对全体施加 ${v} 层中毒`);
+    }
+  });
 }
 /* 回合结束：剩余手牌全部弃置（保留 retain 卡） */
 async function discardHand(){
@@ -1250,6 +1349,7 @@ const STATUS_INFO={
   deathmark:{icon:'💀',name:'死亡印记',good:true,desc:'每回合开始对所有敌人施加等同层数的中毒。'},
   shadowstep:{icon:'🌑',name:'影步',good:true,desc:'每回合开始获得等同层数的敏捷。'},
   rage:{icon:'🤯',name:'暴怒',good:false,desc:'每打出一张牌失去 1 点生命，并在回合开始获得 1 层力量（层数越高代价越大）。'},
+  focus:{icon:'✨',name:'核心过载',good:true,desc:'每层使你的所有储能球（冰/雷/暗）的每回合效果 +1。'},
 };
 function statusHTML(u){
   let h='';
@@ -1262,7 +1362,13 @@ function statusHTML(u){
   }
   return h;
 }
-
+function orbsHTML(p){
+  if(!p.orbs||!p.orbs.length)return '';
+  const f=(p.statuses.focus||0);
+  const chips=p.orbs.map(o=>{const info=ORB_INFO[o.type];const v=o.val+f;
+    return `<span class="orb ${o.type}" data-tip="<b>${info.name}</b>：${info.desc}${f>0?(' 当前核心过载 +'+f+'，实际 '+v+'。'):''}">${info.icon}<b>${v}</b></span>`;}).join('');
+  return `<div class="orbs">${chips}</div>`;
+}
 /* ===================== 牌堆 / 卡组浏览 ===================== */
 function cardFaceHTML(inst,extraClass){
   const def=CARDS[inst.id];
@@ -1332,6 +1438,8 @@ function codexHTML(){
     {t:'🃏 中立卡组（两职业通用）', ids:all.filter(id=>CARDS[id].cls==='neutral')},
     {t:'🦸 铁甲战士 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='warrior'&&CARDS[id].rarity!=='starter')},
     {t:'🏹 暗影游侠 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='hunter'&&CARDS[id].rarity!=='starter')},
+    {t:'🤖 鸡煲 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='bot'&&CARDS[id].rarity==='starter')},
+    {t:'🤖 鸡煲 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='bot'&&CARDS[id].rarity!=='starter')},
   ];
   const body=groups.map(g=>{ if(!g.ids.length)return''; const cards=g.ids.map(id=>cardFaceHTML({id,upgraded:false},'small')).join(''); return `<div class="cgroup"><h3>${g.t} · ${g.ids.length} 张</h3><div class="mgrid">${cards}</div></div>`; }).join('');
   return `<div class="modal" onclick="if(event.target===this)closeCodex()"><div class="mpanel">
@@ -1381,6 +1489,11 @@ function titleHTML(){
         <div class="cb">${CLASSES.hunter.blurb}</div>
         <div class="chp">❤️ ${CLASSES.hunter.maxHp} 生命 · 起始遗物：毒药瓶</div>
       </div>
+      <div class="class-card bot" onclick="newGame('bot')">
+        <div class="cbig">🤖</div><div class="cn">鸡煲</div>
+        <div class="cb">${CLASSES.bot.blurb}</div>
+        <div class="chp">❤️ ${CLASSES.bot.maxHp} 生命 · 起始遗物：破损核心</div>
+      </div>
     </div>
     ${cont}
     <div class="center" style="margin-top:6px"><button class="btn gold" onclick="openCodex()">📖 卡组图鉴</button></div>
@@ -1393,7 +1506,7 @@ function titleHTML(){
 function topbarHTML(){
   const p=state.player;
   const hpPct=Math.round(p.hp/p.maxHp*100);
-  const clsBadge = p.cls==='hunter'?'🏹':'🦸';
+  const clsBadge = clsArt(p.cls);
   return `<div class="topbar">
     <div class="stat"><span class="ico">${clsBadge}</span></div>
     <div class="stat"><span class="ico">❤️</span>
@@ -1515,10 +1628,11 @@ function battleHTML(){
     <div class="arena">
       <div class="player-side">
         <div class="intent" style="opacity:.0">·</div>
-        <div class="psprite" id="playerSprite">${p.cls==='hunter'?'🏹':'🦸'}</div>
-        <div class="ename">${p.cls==='hunter'?'游侠':'勇者'}</div>
+        <div class="psprite" id="playerSprite">${clsArt(p.cls)}</div>
+        <div class="ename">${p.cls==='hunter'?'游侠':p.cls==='bot'?'鸡煲':'勇者'}</div>
         ${blockHTML}
         <div class="pstats">${pStatsHTML}</div>
+        ${orbsHTML(p)}
       </div>
       <div class="enemies">${enemiesHTML}</div>
       <div class="logcenter"><div class="lhead">战 斗 记 录</div><div class="lbody">${state.log.slice(0,6).map((l,i)=>`<div class="logline ${i===0?'fresh':''}">· ${l}</div>`).join('')}</div></div>
@@ -1662,7 +1776,7 @@ function endHTML(win){
       <span>🃏 卡组 ${state.player.deck.length}</span><span>🏆 遗物 ${state.player.relics.length}</span>
     </div>
     <div class="stats-line">累计挑战 <b>${st.runs}</b> · 通关 <b>${st.wins}</b> · 最深 <b>第 ${st.bestFloor} 层</b></div>
-    <button class="btn primary" style="font-size:18px;padding:14px 40px" onclick="newGame(state.player.cls||'warrior')">再来一局（${state.player.cls==='hunter'?'暗影游侠':'铁甲战士'}）</button>
+    <button class="btn primary" style="font-size:18px;padding:14px 40px" onclick="newGame(state.player.cls||'warrior')">再来一局（${clsName(state.player.cls)}）</button>
     <button class="btn gold" onclick="location.reload()">返回标题 / 换职业</button>
   </div>`;
 }

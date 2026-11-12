@@ -500,7 +500,7 @@ const CARDS = {
     desc:d=>`每回合开始获得 <b>1</b> 点力量，但失去 <b>${d.lose}</b> 生命。`, base:{lose:2}, up:{lose:1},
     play:(d,c)=>{c.playerStatus('rage',d.lose);}},
 
-  /* ---- 鸡煲（机器人）基础 ---- */
+  /* ---- 鸡煲基础 ---- */
   peck:{name:'啄击',type:'attack',cost:1,rarity:'starter',art:'🐔',cls:'bot',
     desc:d=>`造成 <b>${d.dmg}</b> 点伤害。`, base:{dmg:6}, up:{dmg:9},
     play:(d,c)=>c.attack(d.dmg)},

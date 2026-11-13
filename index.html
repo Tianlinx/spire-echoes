@@ -327,6 +327,7 @@ const SFX={
   lose(){ tone(330,0.2,'sawtooth',0.11,210); setTimeout(()=>tone(220,0.32,'sawtooth',0.11,110),150); },
   select(){ tone(600,0.05,'sine',0.07); },
   charge(){ tone(660,0.08,'square',0.10,980); setTimeout(()=>tone(880,0.06,'square',0.08,1200),60); },
+  heal(){ tone(560,0.10,'sine',0.10,820); setTimeout(()=>tone(740,0.12,'sine',0.10,980),80); },
 };
 function toggleMute(){ muted=!muted; if(!muted)unlockAudio(); render(); }
 
@@ -460,6 +461,32 @@ const CARDS = {
   overwhelm:{name:'碾压',type:'attack',cost:2,rarity:'uncommon',art:'🪓',cls:'warrior',
     desc:d=>`造成 <b>${d.dmg}</b> 伤害，施加 <b>${d.vuln}</b> 层易伤。`, base:{dmg:14,vuln:2}, up:{dmg:18,vuln:3},
     play:(d,c)=>{c.attack(d.dmg);c.enemyStatus('vulnerable',d.vuln);}},
+
+  /* ---- 战士新增（回血与坚守） ---- */
+  fieldmedic:{name:'战地包扎',type:'skill',cost:1,rarity:'common',art:'🩹',cls:'warrior',
+    desc:d=>`回复 <b>${d.heal}</b> 生命，获得 <b>${d.block}</b> 护甲。`, base:{heal:6,block:4}, up:{heal:9,block:6},
+    play:(d,c)=>{c.heal(d.heal);c.block(d.block);}},
+  sundering:{name:'碎甲击',type:'attack',cost:1,rarity:'common',art:'🪓',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，施加 <b>${d.vuln}</b> 层易伤，抽 <b>1</b> 张牌。`, base:{dmg:7,vuln:2}, up:{dmg:10,vuln:3},
+    play:(d,c)=>{c.attack(d.dmg);c.enemyStatus('vulnerable',d.vuln);c.draw(1);}},
+  recovery:{name:'休整',type:'skill',cost:1,rarity:'uncommon',art:'🛌',cls:'warrior',
+    desc:d=>`回复 <b>${d.heal}</b> 生命，抽 <b>1</b> 张牌。`, base:{heal:10}, up:{heal:14},
+    play:(d,c)=>{c.heal(d.heal);c.draw(1);}},
+  regen:{name:'再生',type:'power',cost:1,rarity:'uncommon',art:'🌿',cls:'warrior',
+    desc:d=>`每回合开始回复 <b>${d.heal}</b> 生命。`, base:{heal:3}, up:{heal:4},
+    play:(d,c)=>c.playerStatus('regen',d.heal)},
+  shieldwall:{name:'盾墙',type:'skill',cost:2,rarity:'uncommon',art:'🛡️',cls:'warrior',
+    desc:d=>`获得 <b>${d.block}</b> 点护甲。`, base:{block:14}, up:{block:18},
+    play:(d,c)=>c.block(d.block)},
+  exhilarate:{name:'振奋',type:'skill',cost:1,rarity:'uncommon',art:'⚡',cls:'warrior',
+    desc:d=>`回复 <b>${d.heal}</b> 生命，获得 <b>${d.eng}</b> 能量。`, base:{heal:5,eng:1}, up:{heal:8,eng:1},
+    play:(d,c)=>{c.heal(d.heal);c.energy(d.eng);}},
+  lifedrain:{name:'汲血',type:'attack',cost:2,rarity:'rare',art:'🩸',cls:'warrior',
+    desc:d=>`造成 <b>${d.dmg}</b> 伤害，并回复等同该伤害的生命。`, base:{dmg:12}, up:{dmg:16},
+    play:(d,c)=>{const e=tgtEnemy();if(!e)return;const a=c.calcAttack(d.dmg);const before=e.hp;c.rawDeal(e,a);state.player.hp=clamp(state.player.hp+(before-e.hp),0,state.player.maxHp);}},
+  warbanner:{name:'战旗',type:'power',cost:2,rarity:'rare',art:'🚩',cls:'warrior',
+    desc:d=>`每回合开始获得 <b>${d.val}</b> 点护甲与 <b>${d.val}</b> 点力量。`, base:{val:2}, up:{val:3},
+    play:(d,c)=>c.playerStatus('warbanner',d.val)},
 
   /* ---- 游侠基础 ---- */
   shoot:{name:'射击',type:'attack',cost:1,rarity:'starter',art:'🏹',cls:'hunter',
@@ -633,9 +660,9 @@ const CLASSES = {
     blurb:'力量与护甲的钢铁洪流。重击、格挡、恶魔形态，正面碾压一切敌人。',
     deck:[['strike',5],['defend',4],['bash',1]],
     pool:{
-      common:['ironwave','cleave','pommel','toxic','rampart','twin','spark','pummel','thunderclap'],
-      uncommon:['bodyslam','heavyblade','whirlwind','bloodletting','anger','offering','immolate','reckless','overwhelm','secondwind','rage'],
-      rare:['demonform','core','fury','reaper','juggernaut'],
+      common:['ironwave','cleave','pommel','toxic','rampart','twin','spark','pummel','thunderclap','fieldmedic','sundering'],
+      uncommon:['bodyslam','heavyblade','whirlwind','bloodletting','anger','offering','immolate','reckless','overwhelm','secondwind','rage','recovery','regen','shieldwall','exhilarate'],
+      rare:['demonform','core','fury','reaper','juggernaut','lifedrain','warbanner'],
     },
   },
   hunter:{
@@ -924,6 +951,8 @@ function startPlayerTurn(first){
   state.player.block=0;
   // 玩家中毒结算
   if(state.player.statuses.poison){ state.player.hp-=state.player.statuses.poison; state.player.statuses.poison--; if(state.player.hp<=0){return gameOver();} }
+  // 再生：每回合开始回复生命
+  if(state.player.statuses.regen){ state.player.hp=clamp(state.player.hp+state.player.statuses.regen,0,state.player.maxHp); }
   b.energy=state.player.maxEnergy;
   // 平静姿态：每回合开始获得护甲
   if(state.player.stance==='calm')state.player.block+=6;
@@ -934,6 +963,7 @@ function startPlayerTurn(first){
   if(state.player.statuses.juggernaut)state.player.statuses.strength=(state.player.statuses.strength||0)+state.player.statuses.juggernaut;
   if(state.player.statuses.coreenergy)b.energy+=state.player.statuses.coreenergy;
   if(state.player.statuses.fury)state.player.block+=state.player.statuses.fury;
+  if(state.player.statuses.warbanner){ state.player.block+=state.player.statuses.warbanner; state.player.statuses.strength=(state.player.statuses.strength||0)+state.player.statuses.warbanner; }
   if(state.player.statuses.deathmark)enemyStatusAllProxy(b);
   if(state.player.statuses.shadowstep)state.player.statuses.dexterity=(state.player.statuses.dexterity||0)+state.player.statuses.shadowstep;
   if(state.player.statuses.rage){ state.player.statuses.strength=(state.player.statuses.strength||0)+1; state.player.hp=Math.max(0,state.player.hp-(state.player.statuses.rage||0)); if(state.player.hp<=0)return gameOver(); }
@@ -1023,6 +1053,7 @@ function makeCtx(){
     draw:(n)=>drawCards(n),
     energy:(n)=>{b.energy+=n;},
     damageSelf:(n)=>{state.player.hp=Math.max(0,state.player.hp-n);},
+    heal:(n)=>{state.player.hp=clamp(state.player.hp+n,0,state.player.maxHp);SFX.heal();floatText('#playerSprite','❤️+'+n,'#7fe0a0');},
     calcAttack:(base)=>calcAttack(state.player,tgtEnemy(),base,false),
     rawDeal:(e,a)=>applyDamage(e,a,true,state.player),
   };
@@ -1475,6 +1506,8 @@ const STATUS_INFO={
   shadowstep:{icon:'🌑',name:'影步',good:true,desc:'每回合开始获得等同层数的敏捷。'},
   rage:{icon:'🤯',name:'暴怒',good:false,desc:'每打出一张牌失去 1 点生命，并在回合开始获得 1 层力量（层数越高代价越大）。'},
   focus:{icon:'✨',name:'核心过载',good:true,desc:'每层使你的所有储能球（冰/雷/暗）的每回合效果 +1。'},
+  regen:{icon:'🌿',name:'再生',good:true,desc:'每回合开始回复等同层数的生命。'},
+  warbanner:{icon:'🚩',name:'战旗',good:true,desc:'每回合开始获得等同层数的护甲与力量。'},
 };
 function statusHTML(u){
   let h='';

@@ -656,7 +656,7 @@ const CARDS = {
 /* ===================== 职业定义 ===================== */
 const CLASSES = {
   warrior:{
-    id:'warrior', name:'铁甲战士', art:'🦸', maxHp:72, startRelic:'burningBlood',
+    id:'warrior', name:'钢铁先锋', art:'🦸', maxHp:72, startRelic:'burningBlood',
     blurb:'力量与护甲的钢铁洪流。重击、格挡、恶魔形态，正面碾压一切敌人。',
     deck:[['strike',5],['defend',4],['bash',1]],
     pool:{
@@ -666,7 +666,7 @@ const CLASSES = {
     },
   },
   hunter:{
-    id:'hunter', name:'暗影游侠', art:'🏹', maxHp:60, startRelic:'poisonVial',
+    id:'hunter', name:'暗夜游猎', art:'🏹', maxHp:60, startRelic:'poisonVial',
     blurb:'剧毒与敏捷的暗影猎手。毒刃、连射、闪避，于无形中腐蚀强敌。',
     deck:[['shoot',5],['dodge',4],['venom',1]],
     pool:{
@@ -697,7 +697,7 @@ const CLASSES = {
   },
 };
 function classPool(cls,rarity){ return (CLASSES[cls]&&CLASSES[cls].pool[rarity])||[]; }
-function clsName(c){ return c==='hunter'?'暗影游侠':c==='bot'?'鸡煲':c==='watcher'?'修行者':'铁甲战士'; }
+function clsName(c){ return c==='hunter'?'暗夜游猎':c==='bot'?'鸡煲':c==='watcher'?'修行者':'钢铁先锋'; }
 function clsArt(c){ return c==='hunter'?'🏹':c==='bot'?'🤖':c==='watcher'?'🧘':'🦸'; }
 const STANCE_INFO={
   calm:{icon:'🧘',name:'平静',good:true,desc:'心境澄明：进入时获得 6 点护甲，且每回合开始再得 6 点护甲。'},
@@ -1597,11 +1597,11 @@ function closeCodex(){ state.codex=false; render(); }
 function codexHTML(){
   const all=Object.keys(CARDS);
   const groups=[
-    {t:'🦸 铁甲战士 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='warrior'&&CARDS[id].rarity==='starter')},
-    {t:'🏹 暗影游侠 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='hunter'&&CARDS[id].rarity==='starter')},
+    {t:'🦸 钢铁先锋 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='warrior'&&CARDS[id].rarity==='starter')},
+    {t:'🏹 暗夜游猎 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='hunter'&&CARDS[id].rarity==='starter')},
     {t:'🃏 中立卡组（两职业通用）', ids:all.filter(id=>CARDS[id].cls==='neutral')},
-    {t:'🦸 铁甲战士 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='warrior'&&CARDS[id].rarity!=='starter')},
-    {t:'🏹 暗影游侠 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='hunter'&&CARDS[id].rarity!=='starter')},
+    {t:'🦸 钢铁先锋 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='warrior'&&CARDS[id].rarity!=='starter')},
+    {t:'🏹 暗夜游猎 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='hunter'&&CARDS[id].rarity!=='starter')},
     {t:'🤖 鸡煲 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='bot'&&CARDS[id].rarity==='starter')},
     {t:'🤖 鸡煲 · 专有可获得卡', ids:all.filter(id=>CARDS[id].cls==='bot'&&CARDS[id].rarity!=='starter')},
     {t:'🧘 修行者 · 基础卡组', ids:all.filter(id=>CARDS[id].cls==='watcher'&&CARDS[id].rarity==='starter')},
@@ -1646,12 +1646,12 @@ function titleHTML(){
     每场战斗后强化卡组，拾取遗物，直至登顶击碎残响。选择你的职业：</div>
     <div class="class-row">
       <div class="class-card warrior" onclick="newGame('warrior')">
-        <div class="cbig">🦸</div><div class="cn">铁甲战士</div>
+        <div class="cbig">🦸</div><div class="cn">钢铁先锋</div>
         <div class="cb">${CLASSES.warrior.blurb}</div>
         <div class="chp">❤️ ${CLASSES.warrior.maxHp} 生命 · 起始遗物：燃烧之血</div>
       </div>
       <div class="class-card hunter" onclick="newGame('hunter')">
-        <div class="cbig">🏹</div><div class="cn">暗影游侠</div>
+        <div class="cbig">🏹</div><div class="cn">暗夜游猎</div>
         <div class="cb">${CLASSES.hunter.blurb}</div>
         <div class="chp">❤️ ${CLASSES.hunter.maxHp} 生命 · 起始遗物：毒药瓶</div>
       </div>

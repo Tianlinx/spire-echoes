@@ -91,6 +91,8 @@
   .evt-opt.selected{border-color:var(--gold);box-shadow:0 0 14px rgba(232,196,104,.5)}
   .evt-confirm{margin-top:14px;display:flex;gap:12px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--gold);border-radius:10px;padding:10px 16px}
   .evt-confirm .btn{padding:6px 16px}
+  .reward-confirm{margin:16px auto 0;display:flex;gap:12px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--gold);border-radius:10px;padding:10px 16px;max-width:560px}
+  .reward-confirm .btn{padding:6px 16px}
 
   /* ===== Battle ===== */
   .battle{flex:1;display:flex;flex-direction:column;min-height:0}
@@ -851,7 +853,7 @@ function newGame(cls){
       deck:[],relics:[C.startRelic],orbs:[],stance:null,
       statuses:{}},
     map:null, battle:null, reward:null, shop:null, event:null, removeReturn:null, cardget:null,
-    pendingNode:null, pendingEvent:null,
+    pendingNode:null, pendingEvent:null, pendingReward:null,
     selectedTarget:0, pileView:null, removePick:null, upgradePick:null, codex:false, log:[],
   };
   C.deck.forEach(([id,n])=>{ for(let i=0;i<n;i++) state.player.deck.push({id,upgraded:false}); });
@@ -1346,8 +1348,18 @@ function grantRandomRelic(silent){
   if(!silent)state.player.relics.push(id);
   return id;
 }
-function chooseReward(cardId){
+function chooseReward(cardId){ // 仅用于「跳过奖励」
   if(cardId)addCardToDeck(cardId,false);
+  state.pendingReward=null;
+  state.reward=null;
+  afterNode();
+}
+function selectReward(id){ state.pendingReward=id; SFX.click(); render(); }
+function cancelReward(){ state.pendingReward=null; SFX.click(); render(); }
+function confirmReward(){
+  const id=state.pendingReward; if(!id)return;
+  addCardToDeck(id,false);
+  state.pendingReward=null;
   state.reward=null;
   afterNode();
 }
@@ -1892,9 +1904,11 @@ function enemyIntentHTML(e){
 }
 function rewardHTML(){
   const r=state.reward; if(!r)return '<div class="overlay"></div>';
+  const pr=state.pendingReward;
   let cardsHTML=r.cards.map(id=>{
     const def=CARDS[id]; const stats={...def.base};
-    return `<div class="card ${def.type} reward-card" onclick="chooseReward('${id}')">
+    const sel=pr===id?'selected':'';
+    return `<div class="card ${def.type} reward-card ${sel}" onclick="selectReward('${id}')">
       <div class="cost">${def.cost}</div><div class="topbar-c"></div>
       <div class="cname">${def.name}</div><div class="cart">${def.art}</div>
       <div class="cdesc">${def.desc(stats)}</div>
@@ -1902,12 +1916,18 @@ function rewardHTML(){
   }).join('');
   let relicHTML='';
   if(r.relic){const R=RELICS[r.relic];relicHTML=`<div class="relic"><span class="ri">${R.art}</span><div><div class="rn">获得遗物：${R.name}</div><div class="rd">${R.desc}</div></div></div>`;}
+  let bar='';
+  if(pr){
+    const def=CARDS[pr];
+    bar=`<div class="reward-confirm">确认选择「<b>${def.name}</b>」加入卡组？ <button class="btn primary" onclick="confirmReward()">确认选择</button> <button class="btn" onclick="cancelReward()">再想想</button></div>`;
+  }
   return `${topbarHTML()}<div class="overlay"><div class="panel">
     <h2>⚔️ 战斗胜利</h2>
-    <div class="desc">获得 <b style="color:var(--gold)">${r.gold}</b> 金币。选择一张卡加入卡组（或跳过）：</div>
+    <div class="desc">获得 <b style="color:var(--gold)">${r.gold}</b> 金币。点击一张卡选中，确认后加入卡组（或跳过）：</div>
     ${relicHTML?relicHTML+'<div style="height:14px"></div>':''}
     <div class="row" style="justify-content:center;margin-bottom:18px">${cardsHTML}</div>
-    <div class="center"><button class="btn" onclick="chooseReward(null)">跳过奖励</button></div>
+    ${bar}
+    <div class="center" style="margin-top:12px"><button class="btn" onclick="chooseReward(null)">跳过奖励</button></div>
   </div></div>`;
 }
 function shopHTML(){
@@ -2040,7 +2060,7 @@ function upgradeHTML(){
 }
 
 /* ===================== 启动 ===================== */
-state={screen:'title',player:{deck:[],relics:[]},map:null,log:[],pileView:null,pendingNode:null,pendingEvent:null};
+state={screen:'title',player:{deck:[],relics:[]},map:null,log:[],pileView:null,pendingNode:null,pendingEvent:null,pendingReward:null};
 window.addEventListener('keydown',e=>{ if(e.key==='Escape'&&state&&state.pileView)closePile(); });
 window.addEventListener('resize',()=>{ if(state&&state.screen==='map')requestAnimationFrame(drawMapLines); });
 document.addEventListener('click',e=>{ if(!e.target.closest('[data-tip]')){ tipPinned=null; const b=document.getElementById('tipbox'); if(b)b.classList.remove('show'); } });

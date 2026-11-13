@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>尖塔残响 · Spire Echoes</title>
+<title>尖塔回声 · Spire Echoes</title>
 <style>
   :root{
     --bg:#14161f; --panel:#1d2030; --panel2:#262a3d; --line:#33384f;
@@ -204,6 +204,12 @@
   /* overlays */
   .overlay{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;padding:24px;overflow:auto}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:26px 30px;max-width:780px;width:100%}
+  .lore-panel{max-width:720px}
+  .lore-body{color:var(--txt);font-size:15px;line-height:1.9}
+  .lore-body p{margin:0 0 12px}
+  .lore-body .lore-note{color:var(--dim);font-size:13px;border-left:3px solid var(--line);padding-left:12px}
+  .clore{margin-top:8px;font-size:12px;color:var(--gold);cursor:pointer;text-align:center;opacity:.85}
+  .clore:hover{opacity:1;text-decoration:underline}
   .panel h2{font-size:24px;margin-bottom:6px;letter-spacing:2px}
   .panel .desc{color:var(--dim);font-size:13px;margin-bottom:18px;line-height:1.7}
   .row{display:flex;gap:14px;flex-wrap:wrap}
@@ -658,6 +664,7 @@ const CLASSES = {
   warrior:{
     id:'warrior', name:'钢铁先锋', art:'🦸', maxHp:72, startRelic:'burningBlood',
     blurb:'力量与护甲的钢铁洪流。重击、格挡、恶魔形态，正面碾压一切敌人。',
+    lore:`<p>他曾是边境要塞的最后一名守将。当要塞在夹缝中崩塌，他没有随砖石一同坠毁，而是被残响之塔收走了一缕执念——「只要还站着，就还有人在」。</p><p>于是他以铁为甲、以怒为刃，把「守住一切」的本能带进这座塔。力量于他不是杀戮，而是「不倒」的承诺。</p>`,
     deck:[['strike',5],['defend',4],['bash',1]],
     pool:{
       common:['ironwave','cleave','pommel','toxic','rampart','twin','spark','pummel','thunderclap','fieldmedic','sundering'],
@@ -668,6 +675,7 @@ const CLASSES = {
   hunter:{
     id:'hunter', name:'暗夜游猎', art:'🏹', maxHp:60, startRelic:'poisonVial',
     blurb:'剧毒与敏捷的暗影猎手。毒刃、连射、闪避，于无形中腐蚀强敌。',
+    lore:`<p>她来自一座从不存在于任何地图的雾港，靠在暗处布毒与潜行讨生活。残响之塔的召唤来临那夜，她正被自己的影子追杀——因为她在太多世界里，杀过太多版本的自己。</p><p>她踏上塔，不为名利，只为在层层回响中，看清哪一道影子才是真正的自己。</p>`,
     deck:[['shoot',5],['dodge',4],['venom',1]],
     pool:{
       common:['quickdraw','poisondart','sidestep','evasion','volley','toxic'],
@@ -678,6 +686,7 @@ const CLASSES = {
   bot:{
     id:'bot', name:'鸡煲', art:'🤖', maxHp:70, startRelic:'crackedCore',
     blurb:'机械与储能球的精密造物。凝霜、蓄雷、病毒轮转，用冰盾、雷伤与暗毒把敌人慢慢磨穿。',
+    lore:`<p>它并非诞生于某条故事线，而是残响之渊本身溢出的一段造物残片：一个被无数机械文明遗弃的练习型核心，带着三颗永远充不满的储能球，漂流至此。</p><p>它没有过去，也不在乎胜负，只是本能地想要「把每一场战斗都跑完」——像一个忘了关机的老兵。</p>`,
     deck:[['peck',4],['shell',4],['boot',1]],
     pool:{
       common:['frostChannel','boltChannel','beam','guard'],
@@ -688,6 +697,7 @@ const CLASSES = {
   watcher:{
     id:'watcher', name:'修行者', art:'🧘', maxHp:64, startRelic:'clearBell',
     blurb:'以姿态流转证道的修行之人。平静守御、愤怒狂攻、神性爆发，于三种心境间切换，攻防随心。',
+    lore:`<p>她本是在某座山上打坐千年、只为证一个「空」字的修行者。塔的共鸣响起时，她忽然明白：空不是无，而是能容下平静、愤怒与神性三种心境而不崩的容器。</p><p>她入塔，是要把这口容器在千回百转的残响里，炼到再不会碎。</p>`,
     deck:[['chop',4],['guard2',4],['meditate',1]],
     pool:{
       common:['zen','angry','scry','palm'],
@@ -831,6 +841,7 @@ const EVENTS = [
 
 /* ===================== 全局状态 ===================== */
 let state = null;
+let loreView = null;
 function newGame(cls){
   unlockAudio();
   const C=CLASSES[cls]||CLASSES.warrior;
@@ -1632,6 +1643,7 @@ function render(){
   else html='';
   if(state.pileView && state.pileView.kind!=='deck' && state.screen!=='battle')state.pileView=null;
   if(state.pileView)html+=pileHTML();
+  if(loreView)html+=loreOverlayHTML();
   app.innerHTML=html;
   processFx();
   if(state.screen==='map')requestAnimationFrame(drawMapLines);
@@ -1640,40 +1652,65 @@ function titleHTML(){
   const st=loadStats();
   let cont = hasSave()?`<button class="btn primary" style="font-size:17px;padding:13px 36px" onclick="continueGame()">继续游戏 ▸</button>`:'';
   return `<div class="title-wrap">
-    <h1>尖塔残响</h1>
-    <p>SLAY THE SPIRE · 卡牌 Roguelike</p>
-    <div class="sub">你是一名攀登尖塔的勇者。抽牌、出牌、构筑卡组，在层层敌人、精英与 Boss 之间杀出一条血路。
-    每场战斗后强化卡组，拾取遗物，直至登顶击碎残响。选择你的职业：</div>
+    <h1>尖塔回声</h1>
+    <p>SPIRE ECHOES · 卡牌构筑 Roguelike</p>
+    <div class="sub">你是一名被残响之塔召唤的「回声旅人」。抽牌、出牌、构筑卡组，在层层敌人、精英与 Boss 之间杀出一条血路；每场战斗后强化卡组、拾取遗物，直至登顶——走出那条从未在原时空走完的路。选择你的职业：</div>
     <div class="class-row">
       <div class="class-card warrior" onclick="newGame('warrior')">
         <div class="cbig">🦸</div><div class="cn">钢铁先锋</div>
         <div class="cb">${CLASSES.warrior.blurb}</div>
         <div class="chp">❤️ ${CLASSES.warrior.maxHp} 生命 · 起始遗物：燃烧之血</div>
+        <div class="clore" onclick="event.stopPropagation();openLore('warrior')">背景 ▸</div>
       </div>
       <div class="class-card hunter" onclick="newGame('hunter')">
         <div class="cbig">🏹</div><div class="cn">暗夜游猎</div>
         <div class="cb">${CLASSES.hunter.blurb}</div>
         <div class="chp">❤️ ${CLASSES.hunter.maxHp} 生命 · 起始遗物：毒药瓶</div>
+        <div class="clore" onclick="event.stopPropagation();openLore('hunter')">背景 ▸</div>
       </div>
       <div class="class-card bot" onclick="newGame('bot')">
         <div class="cbig">🤖</div><div class="cn">鸡煲</div>
         <div class="cb">${CLASSES.bot.blurb}</div>
         <div class="chp">❤️ ${CLASSES.bot.maxHp} 生命 · 起始遗物：破损核心</div>
+        <div class="clore" onclick="event.stopPropagation();openLore('bot')">背景 ▸</div>
       </div>
       <div class="class-card watcher" onclick="newGame('watcher')">
         <div class="cbig">🧘</div><div class="cn">修行者</div>
         <div class="cb">${CLASSES.watcher.blurb}</div>
         <div class="chp">❤️ ${CLASSES.watcher.maxHp} 生命 · 起始遗物：空明心印</div>
+        <div class="clore" onclick="event.stopPropagation();openLore('watcher')">背景 ▸</div>
       </div>
     </div>
     ${cont}
-    <div class="center" style="margin-top:6px"><button class="btn gold" onclick="openCodex()">📖 卡组图鉴</button></div>
+    <div class="center" style="margin-top:10px;display:flex;gap:10px;justify-content:center">
+      <button class="btn gold" onclick="openLore('world')">🌌 世界背景</button>
+      <button class="btn gold" onclick="openCodex()">📖 卡组图鉴</button>
+    </div>
     <div class="stats-line">累计挑战 <b>${st.runs}</b> · 通关 <b>${st.wins}</b> · 最深抵达 <b>第 ${st.bestFloor} 层</b></div>
     <div class="sub" style="margin-top:6px">操作：<b>拖动卡牌</b>到敌人身上发动攻击（拖动时箭头指向目标）；技能/能力拖到上方区域使用。也可<b>点击敌人</b>切换目标、<b>点击卡牌</b>直接出牌；能量耗尽点「结束回合」。<br>
     顶部金色<b>遗物栏</b>常驻显示已获遗物（悬停看效果）；顶栏「查看卡组」或战斗中点击<b>抽牌堆 / 弃牌堆 / 消耗堆</b>可查看其中卡牌（Esc 或点击空白处关闭）。<br>
     <b>核心循环</b>：每回合抽 5 张 → 打出 → <b>回合结束时剩余手牌全部弃入弃牌堆</b>；抽牌堆抽空时弃牌堆洗回，牌库持续循环。</div>
   </div>`;
 }
+/* ===================== 背景故事 ===================== */
+const WORLD_LORE = `
+<p>在已知的宇宙之外，存在着无数破碎的时空裂缝。当一座尖塔在某个世界崩塌，它的最后一声回响不会消散，而是坠入「残响之渊」——一个由无数失败时空拼凑而成的夹缝世界。</p>
+<p>在这里，崩塌的尖塔重新矗立，被唤作「残响之塔」。它没有主人，只反复播放着不同世界里勇者登顶又陨落的残像；而每一次播放，都会从某个夹缝里召唤一名「回声旅人」——一个本不属于此处、却被塔的共鸣牵引而来的灵魂。</p>
+<p>你，正是被召唤者之一。登上残响之塔，不是为了拯救谁，也不是为了某场注定的决战——只是为了在层层回响中，找到属于自己的、那条从未在原本时空里走完的路。</p>
+<p class="lore-note">本作与《杀戮尖塔》原作没有任何剧情关联，仅借用卡牌构筑 Roguelike 的玩法框架，向它致敬。</p>`;
+function loreOverlayHTML(){
+  if(!loreView)return '';
+  let title, body;
+  if(loreView==='world'){ title='🌌 世界背景 · 残响之渊'; body=WORLD_LORE; }
+  else { const c=CLASSES[loreView]; title=c.art+' '+c.name+' · 背景'; body=c.lore; }
+  return `<div class="overlay" onclick="if(event.target===this)closeLore()"><div class="panel lore-panel">
+    <h2>${title}</h2>
+    <div class="lore-body">${body}</div>
+    <div style="margin-top:16px;text-align:right"><button class="btn primary" onclick="closeLore()">关闭 ✕</button></div>
+  </div></div>`;
+}
+function openLore(k){ loreView=k; render(); }
+function closeLore(){ loreView=null; render(); }
 function topbarHTML(){
   const p=state.player;
   const hpPct=Math.round(p.hp/p.maxHp*100);
@@ -1966,7 +2003,7 @@ function endHTML(win){
   const st=loadStats();
   return `<div class="title-wrap">
     <h1 style="background:${win?'linear-gradient(90deg,#5fcf80,#e8c468)':'linear-gradient(90deg,#e0566b,#e08a4f)'};-webkit-background-clip:text;background-clip:text;color:transparent">${win?'登顶成功':'陨落尖塔'}</h1>
-    <div class="sub">${win?'你击碎了尖塔残响，传说由此诞生。':'你的旅程止步于此，但尖塔永远等待着下一位勇者。'}</div>
+    <div class="sub">${win?'你登顶残响之塔，传说由此诞生。':'你的旅程止步于此，但残响之塔永远等待着下一位旅人。'}</div>
     <div class="stat" style="gap:18px;margin:8px 0">
       <span>❤️ 生命 ${state.player.hp}</span><span>💰 金币 ${state.player.gold}</span>
       <span>🃏 卡组 ${state.player.deck.length}</span><span>🏆 遗物 ${state.player.relics.length}</span>

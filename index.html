@@ -142,6 +142,10 @@
   .card{touch-action:none;cursor:grab}
   .card.dragging{transition:none;box-shadow:0 22px 46px #000d;cursor:grabbing;transform:scale(1.05);z-index:85}
   .enemy.aim .sprite{border-color:var(--good);box-shadow:0 0 20px rgba(95,207,128,.7);transform:translateY(-4px)}
+  .dmg-preview{position:absolute;top:-6px;left:50%;transform:translate(-50%,-100%);white-space:nowrap;
+    background:#2a1420;border:1px solid var(--atk);border-radius:9px;padding:5px 10px;font-size:12.5px;
+    color:#f7c9c9;z-index:62;pointer-events:none;box-shadow:0 6px 18px #000b;animation:fade .15s}
+  .dmg-preview b{color:#ff8e9e;font-size:14px}
   .card.play-anim{animation:cardFly .35s ease-in forwards}
   .card .cost{position:absolute;top:-2px;left:-2px;width:34px;height:34px;border-radius:0 0 14px 0;
     background:radial-gradient(circle at 40% 40%,#ffe08a,#e0a52e);color:#1a1208;font-weight:800;
@@ -177,12 +181,6 @@
   .relicchip:hover{transform:translateY(-3px);box-shadow:0 0 20px rgba(232,196,104,.6);border-color:#ffe6a8}
   .relicchip .ri{font-size:21px;filter:drop-shadow(0 0 5px rgba(232,196,104,.7))}
   .relicchip .rn{font-size:12.5px;color:#f4e7c4;white-space:nowrap}
-  .relicchip .tip{position:absolute;top:118%;left:50%;transform:translateX(-50%);width:230px;
-    background:#0d0f18;border:1px solid var(--gold);border-radius:9px;padding:9px 12px;font-size:12px;
-    color:var(--txt);line-height:1.55;z-index:88;opacity:0;pointer-events:none;transition:.15s;
-    box-shadow:0 10px 26px #000c}
-  .relicchip:hover .tip{opacity:1}
-  .relicchip .tip b{color:var(--gold)}
   .relicchip.empty{border-style:dashed;border-color:var(--line);box-shadow:none;cursor:default;background:none}
   .relicchip.empty .rn{color:var(--dim)}
   .relicchip.empty:hover{transform:none;box-shadow:none;border-color:var(--line)}
@@ -202,6 +200,13 @@
   .card.small .cdesc{font-size:10.5px;padding:3px 7px;line-height:1.4}
   .card.small .ctype{font-size:9.5px;padding-bottom:5px}
   .mempty{color:var(--dim);font-size:14px;text-align:center;padding:30px 0}
+  /* ===== 战斗记录全文弹层 ===== */
+  .logpanel{max-width:720px}
+  .logfull{overflow:auto;max-height:70vh;display:flex;flex-direction:column;gap:2px;padding-right:4px}
+  .logrow{display:flex;gap:10px;align-items:flex-start;padding:5px 8px;border-bottom:1px solid var(--line);font-size:13px;line-height:1.4}
+  .logrow:nth-child(odd){background:rgba(255,255,255,.025)}
+  .logrow .lr-n{flex:0 0 30px;text-align:right;color:var(--gold);opacity:.6;font-variant-numeric:tabular-nums}
+  .logrow .lr-t{color:#d6daf0;word-break:break-word}
 
   /* overlays */
   .overlay{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;padding:24px;overflow:auto}
@@ -237,6 +242,8 @@
     width:min(660px,76%);max-height:104px;overflow:hidden;
     background:rgba(13,15,24,.34);border:none;border-radius:12px;padding:7px 16px 9px;text-align:center}
   .logcenter .lhead{font-size:11px;letter-spacing:5px;color:var(--gold);opacity:.7;margin-bottom:4px;font-weight:700}
+  .logcenter .lhead .logmore{pointer-events:auto;letter-spacing:0;font-size:11px;color:var(--gold);background:rgba(232,196,104,.12);border:1px solid var(--gold);border-radius:6px;padding:1px 8px;margin-left:10px;cursor:pointer;font-weight:700;opacity:.9;transition:.15s}
+  .logcenter .lhead .logmore:hover{background:var(--gold);color:#1a1622;opacity:1}
   .logcenter .lbody{display:flex;flex-direction:column;align-items:center;gap:3px}
   .logline{font-size:15px;color:#cdd2e8;line-height:1.32;opacity:.78;padding:1px 0}
   .logline.fresh{font-size:22px;font-weight:800;color:#fff;opacity:1;letter-spacing:.5px;
@@ -359,6 +366,7 @@ function processFx(){
   bindTips();
 }
 let tipPinned=null;
+function escAttr(s){return String(s==null?'':s).replace(/"/g,'&quot;');}
 function bindTips(){
   const box=document.getElementById('tipbox'); if(!box)return;
   const els=document.querySelectorAll('[data-tip]');
@@ -853,7 +861,7 @@ function newGame(cls){
       deck:[],relics:[C.startRelic],orbs:[],stance:null,
       statuses:{}},
     map:null, battle:null, reward:null, shop:null, event:null, removeReturn:null, cardget:null,
-    pendingNode:null, pendingEvent:null, pendingReward:null,
+    pendingNode:null, pendingEvent:null, pendingReward:null, logOpen:false,
     selectedTarget:0, pileView:null, removePick:null, upgradePick:null, codex:false, log:[],
   };
   C.deck.forEach(([id,n])=>{ for(let i=0;i<n;i++) state.player.deck.push({id,upgraded:false}); });
@@ -1020,6 +1028,26 @@ function calcAttack(source,target,base,doubleStr){
   }
   return Math.max(0,d);
 }
+// 预估一张攻击卡对指定敌人造成的实际伤害与剩余血量（不改状态）
+function estimateCardDamage(inst,enemy){
+  const def=CARDS[inst.id];
+  if(!def||def.type!=='attack'||!enemy||enemy.hp<=0)return null;
+  const s=inst.upgraded?{...def.base,...def.up}:{...def.base};
+  let base=s.dmg||0, times=s.times||1, doubleStr=false, pierce=false;
+  if(inst.id==='bodyslam')base=state.player.block;
+  if(inst.id==='heavyblade')doubleStr=true;
+  const src=def.play?def.play.toString():'';
+  if(/attackPierce/.test(src))pierce=true;
+  let total=0, tmpBlock=pierce?0:enemy.block;
+  for(let i=0;i<times;i++){
+    let raw=calcAttack(state.player,enemy,base,doubleStr);
+    if(enemy.statuses.vulnerable)raw=Math.floor(raw*1.5);
+    if(!pierce){const blocked=Math.min(tmpBlock,raw);tmpBlock-=blocked;raw-=blocked;}
+    total+=raw;
+  }
+  const remain=Math.max(0,enemy.hp-total);
+  return {real:total,remain};
+}
 function applyDamage(target,amount,isAttack,source){
   if(isAttack && target.statuses.vulnerable)amount=Math.floor(amount*1.5);
   let blocked=Math.min(target.block,amount); target.block-=blocked;
@@ -1110,6 +1138,7 @@ function cardUp(e){
   const d=drag; drag=null;
   clearArrow();
   document.querySelectorAll('.enemy.aim').forEach(x=>x.classList.remove('aim'));
+  clearDmgPreview();
   const b=state.battle; if(!b)return;
   if(!d.moved){ playCardAnimated(d.idx,null); return; }
   const def=d.def, playable=b.energy>=def.cost;
@@ -1128,9 +1157,29 @@ function cardUp(e){
   }
 }
 function enemyUnder(x,y){ const el=document.elementFromPoint(x,y); return el?el.closest('.enemy'):null; }
+function clearDmgPreview(){ document.querySelectorAll('.dmg-preview').forEach(x=>x.remove()); }
 function highlightAim(en){
   document.querySelectorAll('.enemy.aim').forEach(x=>x.classList.remove('aim'));
-  if(en){ const idx=+en.dataset.idx; if(state.battle.enemies[idx]&&state.battle.enemies[idx].hp>0)en.classList.add('aim'); }
+  clearDmgPreview();
+  if(en){
+    const idx=+en.dataset.idx;
+    if(state.battle.enemies[idx]&&state.battle.enemies[idx].hp>0){
+      en.classList.add('aim');
+      // 攻击卡悬停时预览攻击后的血量
+      if(drag && drag.def && drag.def.type==='attack'){
+        const inst=state.battle.hand[drag.idx];
+        if(inst){
+          const est=estimateCardDamage(inst,state.battle.enemies[idx]);
+          if(est){
+            const badge=document.createElement('div');
+            badge.className='dmg-preview';
+            badge.innerHTML=`预估 <b>-${est.real}</b> · ${state.battle.enemies[idx].hp}→<b>${est.remain}</b>`;
+            en.appendChild(badge);
+          }
+        }
+      }
+    }
+  }
 }
 function updateArrow(e){
   const d=drag; if(!d)return; clearArrow();
@@ -1508,7 +1557,7 @@ function loadStats(){ try{return JSON.parse(localStorage.getItem(STATS_KEY))||{r
 function bumpStats(fn){ try{const s=loadStats();fn(s);localStorage.setItem(STATS_KEY,JSON.stringify(s));}catch(e){} }
 
 /* ===================== 日志/提示 ===================== */
-function log(t){ state.log.unshift(t); if(state.log.length>30)state.log.pop(); }
+function log(t){ state.log.unshift(t); if(state.log.length>2000)state.log.pop(); }
 function toast(t){
   const d=document.createElement('div'); d.className='toast'; d.textContent=t;
   document.body.appendChild(d); setTimeout(()=>d.remove(),1800);
@@ -1615,6 +1664,19 @@ function pileHTML(){
   </div>`;
 }
 
+function openLog(){ state.logOpen=true; SFX.click(); render(); }
+function closeLog(){ state.logOpen=false; SFX.click(); render(); }
+function logHTML(){
+  if(!state.logOpen)return'';
+  const rows=state.log.length
+    ? state.log.map((l,i)=>`<div class="logrow"><span class="lr-n">${state.log.length-i}</span><span class="lr-t">${l}</span></div>`).join('')
+    : '<div class="mempty">暂无战斗记录。</div>';
+  return `<div class="modal" onclick="if(event.target===this)closeLog()"><div class="mpanel logpanel">
+    <div class="mhead"><h2>📜 战斗记录 · 全部</h2><span class="note">本局累计 ${state.log.length} 条 · 最新的在最前</span><div class="spacer" style="flex:1"></div><button class="btn primary" onclick="closeLog()">关闭 ✕</button></div>
+    <div class="logfull">${rows}</div>
+  </div></div>`;
+}
+
 function openCodex(){ state.codex=true; render(); }
 function closeCodex(){ state.codex=false; render(); }
 function codexHTML(){
@@ -1655,6 +1717,7 @@ function render(){
   else html='';
   if(state.pileView && state.pileView.kind!=='deck' && state.screen!=='battle')state.pileView=null;
   if(state.pileView)html+=pileHTML();
+  if(state.logOpen && state.screen==='battle')html+=logHTML();
   if(loreView)html+=loreOverlayHTML();
   app.innerHTML=html;
   processFx();
@@ -1746,8 +1809,8 @@ function relicbarHTML(){
   if(p.relics.length){
     chips=p.relics.map(r=>{
       const R=RELICS[r];
-      return `<div class="relicchip"><span class="ri">${R.art}</span><span class="rn">${R.name}</span>
-        <div class="tip"><b>${R.name}</b><br>${R.desc}</div></div>`;
+      const tip=escAttr(`<b>${R.name}</b><br>${R.desc}`);
+      return `<div class="relicchip" data-tip="${tip}"><span class="ri">${R.art}</span><span class="rn">${R.name}</span></div>`;
     }).join('');
   } else {
     chips=`<div class="relicchip empty"><span class="rn">暂无遗物 · 击败精英/BOSS 或商店可获得</span></div>`;
@@ -1870,7 +1933,7 @@ function battleHTML(){
         ${stanceHTML(p)}
       </div>
       <div class="enemies">${enemiesHTML}</div>
-      <div class="logcenter"><div class="lhead">战 斗 记 录</div><div class="lbody">${state.log.slice(0,6).map((l,i)=>`<div class="logline ${i===0?'fresh':''}">· ${l}</div>`).join('')}</div></div>
+      <div class="logcenter"><div class="lhead">战 斗 记 录 <button class="logmore" onclick="openLog()" title="查看全部回合记录">全部 ${state.log.length} 条 ▸</button></div><div class="lbody">${state.log.slice(0,6).map((l,i)=>`<div class="logline ${i===0?'fresh':''}">· ${l}</div>`).join('')}</div></div>
     </div>
     <div class="handzone" id="handzone">${handHTML}</div>
     <div class="bottombar">
@@ -2060,8 +2123,8 @@ function upgradeHTML(){
 }
 
 /* ===================== 启动 ===================== */
-state={screen:'title',player:{deck:[],relics:[]},map:null,log:[],pileView:null,pendingNode:null,pendingEvent:null,pendingReward:null};
-window.addEventListener('keydown',e=>{ if(e.key==='Escape'&&state&&state.pileView)closePile(); });
+state={screen:'title',player:{deck:[],relics:[]},map:null,log:[],pileView:null,pendingNode:null,pendingEvent:null,pendingReward:null,logOpen:false};
+window.addEventListener('keydown',e=>{ if(e.key!=='Escape'||!state)return; if(state.logOpen)closeLog(); else if(state.pileView)closePile(); else if(loreView)closeLore(); });
 window.addEventListener('resize',()=>{ if(state&&state.screen==='map')requestAnimationFrame(drawMapLines); });
 document.addEventListener('click',e=>{ if(!e.target.closest('[data-tip]')){ tipPinned=null; const b=document.getElementById('tipbox'); if(b)b.classList.remove('show'); } });
 render();
